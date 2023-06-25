@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trader Companion - Check Strategies</title>
+  <!-- Include Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <a class="navbar-brand" href="#">Trader Companion</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link" href="#">Login</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <h1>Available Strategies</h1>
+
+    <div class="row mt-5" id="strategies-container">
+      <!-- Strategies will be dynamically added here -->
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer bg-dark text-white text-center py-3 mt-5">
+    <div class="container">
+      <span>&copy; 2023 Trader Companion. All rights reserved.</span>
+    </div>
+  </footer>
+
+  <!-- Include Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    // Function to handle card click and redirect to select_stocks
+    function handleCardClick(strategyId) {
+      window.location.href = `/select_stocks/${strategyId}`;
+    }
+
+    // Function to fetch and display strategies
+    async function fetchStrategies() {
+      try {
+        const response = await fetch('/api/strategies'); // Replace with your API endpoint to fetch strategies
+        const strategies = await response.json();
+
+        const strategiesContainer = document.getElementById('strategies-container');
+
+        let columnCount = 0;
+        let row = document.createElement('div');
+        row.className = 'row';
+
+        strategies.forEach(strategy => {
+          const strategyCard = `
+            <div class="col-md-4 mb-4">
+              <div class="card" onclick="handleCardClick(${strategy.strategy_id})">
+                <div class="card-body">
+                  <h5 class="card-title">${strategy.strategy_name}</h5>
+                  <p class="card-text">${strategy.description}</p>
+                </div>
+              </div>
+            </div>
+          `;
+
+          row.innerHTML += strategyCard;
+          columnCount++;
+
+          if (columnCount === 3) {
+            strategiesContainer.appendChild(row);
+            row = document.createElement('div');
+            row.className = 'row';
+            columnCount = 0;
+          }
+        });
+
+        // Append the remaining row if not empty
+        if (columnCount > 0) {
+          strategiesContainer.appendChild(row);
+        }
+      } catch (error) {
+        console.error('Error fetching strategies:', error);
+      }
+    }
+
+    // Call the function to fetch and display strategies
+    fetchStrategies();
+  </script>
+</body>
+</html>
