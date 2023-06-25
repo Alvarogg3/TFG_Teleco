@@ -68,24 +68,35 @@ def check_data_availability():
     for ticker in tickers:
         if not check_and_fetch_stock_data(ticker, end_date):
             missing_tickers.append(ticker)
-
     return jsonify({'missingTickers': missing_tickers})
+
+@app.route('/get_strategies')
+def get_strategies():
+    # Establish a connection to MongoDB
+    client = MongoClient('mongodb://localhost:27017/')
+
+    # Access the collection for the strategies
+    db = client['strategies']
+    dfstrat_collection = db['default_strategies']
+
+    strategies = dfstrat_collection.find({}, {"_id": 0})  # Exclude the _id field from the result
+    return jsonify(list(strategies))
 
 @app.route('/execute_strategy/<int:strategy_id>')
 def execute_strategy(strategy_id):
     # Retrieve the strategy from the MongoDB collection
-    strategy_data = dfstrat_collection.find_one({'strategy_id': strategy_id})
-    if strategy_data is None:
-        return jsonify({'error': 'Strategy not found'})
+    strategy_id = int(request.json['strategy_id'])
 
-    # Unpickle the strategy object
-    strategy_pickle = strategy_data['pickle']
-    strategy = pickle.loads(strategy_pickle)
+    # Get the strategy class based on the strategy ID
+    if strategy_id < 0 or strategy_id >= len(strategy_classes):
+        return f"Invalid strategy ID: {strategy_id}"
+        
+    selected_strategy_class = strategy_classes[strategy_id]
 
     # Get the input parameters from the query string
     start_date = request.args.get('startDate')
     end_date = request.args.get('endDate')
-    ticker = strategy_data['ticker']
+    ticker = request.args.get('ticker')
 
     # Fetch stock data for the ticker
     stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
@@ -95,7 +106,7 @@ def execute_strategy(strategy_id):
     data.index = pd.to_datetime(data.index)
 
     # Execute the strategy with the stock data
-    bt = Backtest(stock_data, data, cash=10000, commission=.002, exclusive_orders=True)
+    bt = Backtest(stock_data, selected_strategy_class, cash=10000, commission=.002, exclusive_orders=True)
 
     try:    
         result = bt.run(stock_data)

@@ -54,7 +54,7 @@
     // Function to fetch and display strategies
     async function fetchStrategies() {
       try {
-        const response = await fetch('/api/strategies'); // Replace with your API endpoint to fetch strategies
+        const response = await fetch('/get_strategies'); // Replace with your API endpoint to fetch strategies
         const strategies = await response.json();
 
         const strategiesContainer = document.getElementById('strategies-container');
