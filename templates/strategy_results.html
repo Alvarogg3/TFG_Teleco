@@ -30,15 +30,20 @@
     <h1 class="mt-4">Strategy Results</h1>
 
     <div class="mt-5">
-      <!-- Output data here -->
-      {{ output }}
+        <!-- Output data here -->
+        <p>{{ output[:-3] }}</p>
     </div>
 
     <div class="mt-5">
-      <!-- Download buttons here -->
-      <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='output') }}" class="btn btn-primary">Download Output</a>
-      <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='equity_curve') }}" class="btn btn-primary">Download Equity Curve</a>
-      <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades') }}" class="btn btn-primary">Download Trades</a>
+        <!-- Display the plot using an iframe -->
+        <iframe src="{{ plot_filename }}" width="800" height="600"></iframe>
+    </div>
+
+    <div class="mt-5">
+        <!-- Download buttons here -->
+        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='output', output=output[:-3]) }}" class="btn btn-primary">Download Output</a>
+        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='equity_curve', equity_curve=output[-2]) }}" class="btn btn-primary">Download Equity Curve</a>
+        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades', trades=output[-1]) }}" class="btn btn-primary">Download Trades</a>
     </div>
   </main>
 

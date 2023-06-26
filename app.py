@@ -1,6 +1,7 @@
 ## LIBRARIES
 # Framework
-from flask import Flask, render_template, jsonify, redirect, request
+from flask import Flask, render_template, jsonify, redirect, send_from_directory, send_file, request
+ 
 # Data API
 from alpha_vantage.timeseries import TimeSeries
 # Database
@@ -9,6 +10,8 @@ from pymongo import MongoClient
 import pandas as pd
 import requests
 import json
+import os
+import io
 
 # Backtesting
 from backtesting import Backtest, Strategy
@@ -78,7 +81,7 @@ def get_stock_info():
     
     # Check if the response is empty
     if not data:
-        return jsonify({'error': f'Ticker "{ticker}" not found.'}), 404
+        return jsonify({'error': f'Currently we do not have information about the "{ticker}" ticker.'}), 404
     else:
         return data
 
@@ -113,14 +116,14 @@ def execute_strategy(strategy_id):
     if strategy_id < 0 or strategy_id >= len(strategy_classes):
         return f"Invalid strategy ID: {strategy_id}"
 
-    selected_strategy_class = strategy_classes[strategy_id-1]
+    selected_strategy_class = strategy_classes[strategy_id]
 
     # Get the input parameters from the query string
     start_date = request.args.get('startDate')
     end_date = request.args.get('endDate')
     ticker = request.args.get('ticker')
 
-    # Fetch stock data for the ticker
+    # Get stock data for the ticker from MongoDB
     stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
 
     # Execute the strategy with the stock data
@@ -128,10 +131,61 @@ def execute_strategy(strategy_id):
 
     try:
         result = bt.run(stock_data)
-        # Process the result as needed
-        return render_template('strategy_results.html', result=result)
+
+        # Generate the plot and save it as HTML
+        plot_filename = f"static/html_outputs/{selected_strategy_class.__name__}.html"
+        bt.plot(filename=plot_filename, open_browser=False)
+
+        # Pass the plot filename and strategy results to the template
+        return render_template('strategy_results.html', output=result, plot_filename=plot_filename, strategy_id=strategy_id)
     except Exception as e:
         return jsonify({'error': str(e)})
+    
+@app.route('/html_outputs/<path:filename>')
+def serve_output(filename):
+    root_dir = os.path.dirname(os.getcwd())
+    return send_from_directory(os.path.join(root_dir, 'static', 'html_outputs'), filename)
+
+@app.route('/download_data')
+def download_data():
+    strategy_id = request.args.get('strategy_id')
+    data_type = request.args.get('data_type')
+
+    if data_type == 'output':
+        # Process output data
+        output = request.args.get('output')
+
+        # Generate Excel file
+        filename = f"output_{strategy_id}.xlsx"
+        output_data = {'output': output}  # Replace with the actual output data
+        df_output = pd.DataFrame(output_data)
+        df_output.to_excel(filename, index=False)
+
+    elif data_type == 'equity_curve':
+        # Process equity curve data
+        equity_curve = request.args.get('equity_curve')
+
+        # Generate Excel file
+        filename = f"equity_curve_{strategy_id}.xlsx"
+        equity_curve_data = {'equity_curve': equity_curve}  # Replace with the actual equity curve data
+        df_equity_curve = pd.DataFrame(equity_curve_data)
+        df_equity_curve.to_excel(filename, index=False)
+
+    elif data_type == 'trades':
+        # Process trades data
+        trades = request.args.get('trades')
+
+        # Generate Excel file
+        filename = f"trades_{strategy_id}.xlsx"
+        trades_data = {'trades': trades}  # Replace with the actual trades data
+        df_trades = pd.DataFrame(trades_data)
+        df_trades.to_excel(filename, index=False)
+
+    else:
+        return jsonify({'error': f"Invalid data type: {data_type}"})
+
+    # Send the file for download
+    return send_file(filename, as_attachment=True)
     
 ## FUNCTIONS
 # Check if the stock data exists in MongoDB, if not fetch from API and save to MongoDB
@@ -155,6 +209,9 @@ def check_and_fetch_stock_data(ticker, end_date):
 
         # Adjust the stock data
         adjusted_df = adjust_stock_data(df)
+
+        # Convert the index (date) to strings before saving to MongoDB
+        adjusted_df.index = adjusted_df.index.strftime('%Y-%m-%d')
 
         # Delete the existing collection for the ticker
         client['stock_cache_db'].drop_collection(ticker)

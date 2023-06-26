@@ -52,14 +52,17 @@
         <div class="input-group">
           <input type="text" class="form-control ticker-input" placeholder="Enter ticker" required>
           <div class="input-group-append">
-            <button class="btn btn-primary info-btn">+info</button>
+            <button type="button" class="btn btn-primary info-btn">+info</button>
           </div>
         </div>
       </div>
 
+      <!-- Stock Info -->
+      <div id="stock-info"></div>
+
       <!-- Submit Button -->
       <div class="form-group">
-        <button class="btn btn-success" id="submit-btn">Submit</button>
+        <button type="submit" class="btn btn-success" id="submit-btn">Submit</button>
       </div>
     </form>
   </main>
@@ -83,7 +86,7 @@
     // Check today's date
     document.addEventListener('DOMContentLoaded', function() {
       const today = new Date().toISOString().split('T')[0];
-      const startDateInput = document.getElementById('start-date'); //Change date format to yy/mm/dd
+      const startDateInput = document.getElementById('start-date');
       const endDateInput = document.getElementById('end-date');
 
       startDateInput.setAttribute('max', today);
@@ -94,6 +97,7 @@
       const tickerInput = document.querySelector('.ticker-input');
       const infoButton = document.querySelector('.info-btn');
       const submitButton = document.getElementById('submit-btn');
+      const stockInfoDiv = document.getElementById('stock-info');
 
       // Autocomplete method
       $(tickerInput).typeahead({
@@ -125,7 +129,9 @@
       });
 
       // Submit button
-      submitButton.addEventListener('click', function() {
+      submitButton.addEventListener('click', function(event) {
+        event.preventDefault(); // Prevent the default form submission
+
         const startDate = document.getElementById('start-date').value;
         const endDate = document.getElementById('end-date').value;
         const ticker = extractTickerSymbol(tickerInput.value);
@@ -146,16 +152,16 @@
         }
 
         // Extract the strategy ID from the current URL
-        const urlParts = window.location.href.split('/');
-        const strategyId = urlParts[urlParts.length - 1];
+        const url = new URL(window.location.href);
+        const strategyId = parseInt(url.pathname.split('/').pop()) || 0;
 
-        // Send the startDate, endDate, and selectedTickers to the backend
+        // Send the startDate, endDate, and ticker to the backend
         fetch('/check_data_availability', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ endDate: endDate, ticker: ticker }),
+          body: JSON.stringify({ strategyId: strategyId, startDate: startDate, endDate: endDate, ticker: ticker }),
         })
           .then((response) => response.json())
           .then((data) => {
@@ -164,8 +170,9 @@
               return;
             }
 
-            // Get the strategy ID from the URL
-            const strategyId = parseInt(request.args.get('strategyId'));
+            // Extract the strategy ID from the current URL
+            const url = new URL(window.location.href);
+            const strategyId = parseInt(url.pathname.split('/').pop()) || 0;
 
             // Construct the redirect URL based on the strategy ID
             let redirectUrl = '';
@@ -180,7 +187,7 @@
             }
 
             // Append the form values as query parameters to the redirect URL
-            redirectUrl += `?startDate=${startDate}&endDate=${endDate}&tickers=${selectedTickers.join(',')}`;
+            redirectUrl += `?startDate=${startDate}&endDate=${endDate}&ticker=${ticker}`;
 
             // Redirect the user to the appropriate page with the form values
             window.location.href = redirectUrl;
@@ -198,12 +205,16 @@
 
     // Function to display stock information or error message
     function displayStockInfo(data) {
-      const infoDiv = document.createElement('div');
-      
+      const stockInfoDiv = document.getElementById('stock-info');
+      stockInfoDiv.innerHTML = ''; // Clear previous content
+
       if (data.error) {
-        infoDiv.classList.add('alert', 'alert-danger');
-        infoDiv.textContent = data.error;
+        const errorDiv = document.createElement('div');
+        errorDiv.classList.add('alert', 'alert-danger');
+        errorDiv.textContent = data.error;
+        stockInfoDiv.appendChild(errorDiv);
       } else {
+        const infoDiv = document.createElement('div');
         infoDiv.classList.add('stock-info');
         infoDiv.innerHTML = `
           <h4>${data.Symbol} - ${data.Name}</h4>
@@ -221,16 +232,8 @@
           <p><strong>Revenue TTM:</strong> ${data.RevenueTTM}</p>
           <!-- Add more information here -->
         `;
+        stockInfoDiv.appendChild(infoDiv);
       }
-      
-      const mainForm = document.getElementById('main-form');
-      const existingInfoDiv = document.querySelector('.stock-info');
-      
-      if (existingInfoDiv) {
-        existingInfoDiv.remove();
-      }
-      
-      mainForm.insertAdjacentElement('afterend', infoDiv);
     }
   </script>
 </body>
