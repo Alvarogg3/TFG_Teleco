@@ -6,6 +6,17 @@
   <title>Trader Companion</title>
   <!-- Include Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    .main-content {
+      margin-top: 80px;
+    }
+    .main-content p {
+      margin-bottom: 20px;
+    }
+    .main-content .btn-block {
+      margin-top: 30px;
+    }
+  </style>
 </head>
 <body>
   <!-- Header -->
@@ -26,14 +37,21 @@
   </header>
 
   <!-- Main Content -->
-  <main class="container">
-    <h1>Welcome to Trader Companion</h1>
+  <main class="container main-content">
+    <h1 class="mt-4">Welcome to Trader Companion!</h1>
+    <div class="row mt-5">
+      <div class="col-md-12">
+        <p class="lead">Trader Companion is a <strong>powerful</strong> tool designed to assist traders in making <strong>informed decisions</strong> and maximizing their <strong>trading strategies</strong>.</p>
+        <p class="lead">With Trader Companion, you can explore a wide range of <strong>predefined strategies</strong>, analyze market trends, and select the most suitable stocks to execute your trading plan.</p>
+        <p class="lead">Start by checking out the <strong>available strategies</strong> below and choose the one that aligns with your trading goals. Then, select the stocks to apply the strategy and take your trading to the <strong>next level</strong>. Trader Companion also allows you to <strong>optimize</strong> the strategies to further enhance your trading performance.</p>
+      </div>
+    </div>
     <div class="row mt-5">
       <div class="col-md-6">
-        <a href="/select_stocks/0" class="btn btn-primary btn-lg btn-block">Create My Own Strategy</a>
+        <a href="/check_strategies" class="btn btn-primary btn-lg btn-block">Learn and Test Common Strategies</a>
       </div>
       <div class="col-md-6">
-        <a href="/check_strategies" class="btn btn-secondary btn-lg btn-block" id="test-strategy-btn">Test a Predefined Strategy</a>
+        <a href="/select_stocks/0" class="btn btn-secondary btn-lg btn-block" id="test-strategy-btn">Upload your Own Strategy</a>
       </div>
     </div>
   </main>
@@ -50,3 +68,5 @@
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
   <!-- <script src="{{ url_for('static', filename='main.js') }}"></script> -->
+</body>
+</html>

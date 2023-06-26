@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trader Companion - Strategy Results</title>
+  <!-- Include Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <a class="navbar-brand" href="/">Trader Companion</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link" href="#">Login</a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <h1 class="mt-4">Strategy Results</h1>
+
+    <div class="mt-5">
+      <!-- Output data here -->
+      {{ output }}
+    </div>
+
+    <div class="mt-5">
+      <!-- Download buttons here -->
+      <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='output') }}" class="btn btn-primary">Download Output</a>
+      <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='equity_curve') }}" class="btn btn-primary">Download Equity Curve</a>
+      <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades') }}" class="btn btn-primary">Download Trades</a>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer bg-dark text-white text-center py-3 mt-5">
+    <div class="container">
+      <span>&copy; 2023 Trader Companion. All rights reserved.</span>
+    </div>
+  </footer>
+
+  <!-- Include Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

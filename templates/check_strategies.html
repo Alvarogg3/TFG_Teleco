@@ -11,7 +11,7 @@
   <!-- Header -->
   <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <a class="navbar-brand" href="#">Trader Companion</a>
+      <a class="navbar-brand" href="/">Trader Companion</a>
       <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -27,7 +27,7 @@
 
   <!-- Main Content -->
   <main class="container">
-    <h1>Available Strategies</h1>
+    <h1 class="mt-4">Available Strategies</h1>
 
     <div class="row mt-5" id="strategies-container">
       <!-- Strategies will be dynamically added here -->
@@ -59,37 +59,22 @@
 
         const strategiesContainer = document.getElementById('strategies-container');
 
-        let columnCount = 0;
-        let row = document.createElement('div');
-        row.className = 'row';
-
         strategies.forEach(strategy => {
           const strategyCard = `
             <div class="col-md-4 mb-4">
-              <div class="card" onclick="handleCardClick(${strategy.strategy_id})">
+              <div class="card">
+                <img class="card-img-top" src="../static/images/strategies.jpg" alt="Strategy Image">
                 <div class="card-body">
                   <h5 class="card-title">${strategy.strategy_name}</h5>
                   <p class="card-text">${strategy.description}</p>
+                  <a href="/select_stocks/${strategy.strategy_id}" class="btn btn-primary">Test Strategy</a>
                 </div>
               </div>
             </div>
           `;
 
-          row.innerHTML += strategyCard;
-          columnCount++;
-
-          if (columnCount === 3) {
-            strategiesContainer.appendChild(row);
-            row = document.createElement('div');
-            row.className = 'row';
-            columnCount = 0;
-          }
+          strategiesContainer.innerHTML += strategyCard;
         });
-
-        // Append the remaining row if not empty
-        if (columnCount > 0) {
-          strategiesContainer.appendChild(row);
-        }
       } catch (error) {
         console.error('Error fetching strategies:', error);
       }

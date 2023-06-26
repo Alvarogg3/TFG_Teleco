@@ -8,7 +8,8 @@ from pymongo import MongoClient
 # Util
 import pandas as pd
 import requests
-import pickle
+import json
+
 # Backtesting
 from backtesting import Backtest, Strategy
 # Custom module
@@ -16,8 +17,13 @@ from importlib import import_module
 import inspect
 from modules.default_strategies import *
 
-## CONSTANT
-ALPHAVANTAGE_KEY = "99ZHWN89YKD8GTCT"
+## ALPHAVANTAGE API KEYS
+# Load the keys from the json file
+with open('static/tokens.json') as file:
+    keys_data = json.load(file)
+# Access the keys
+ALPHAVANTAGE_KEY = keys_data['ALPHAVANTAGE_KEY']
+ALPHAVANTAGE_KEY_2 = keys_data['ALPHAVANTAGE_KEY_2']
 
 ## STRATEGY METHODS
 # Get the strategies module dynamically
@@ -28,6 +34,9 @@ strategy_classes = [cls for name, cls in inspect.getmembers(strategies_module, i
 ## DATABASE
 # Establish a connection to MongoDB
 client = MongoClient('mongodb://localhost:27017/')
+
+# Access the stock cach database
+stock_cache_db = client['stock_cache_db']
 
 # Access the collection for the strategies info
 db = client['strategies']
@@ -59,16 +68,29 @@ def search_ticker():
     data = requests.get(url).json()
     return data
 
+@app.route('/get_stock_info', methods=['GET'])
+def get_stock_info():
+    ticker = request.args.get('ticker')
+    url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker}&apikey={ALPHAVANTAGE_KEY_2}'
+    
+    response = requests.get(url)
+    data = response.json()
+    
+    # Check if the response is empty
+    if not data:
+        return jsonify({'error': f'Ticker "{ticker}" not found.'}), 404
+    else:
+        return data
+
 @app.route('/check_data_availability', methods=['POST'])
 def check_data_availability():
     end_date = request.json['endDate']
-    tickers = request.json['tickers']
+    ticker = request.json['ticker']
 
-    missing_tickers = []
-    for ticker in tickers:
-        if not check_and_fetch_stock_data(ticker, end_date):
-            missing_tickers.append(ticker)
-    return jsonify({'missingTickers': missing_tickers})
+    if not check_and_fetch_stock_data(ticker, end_date):
+        return jsonify({'error': f'Ticker "{ticker}" not found.'}), 404
+    else:
+        return ticker
 
 @app.route('/get_strategies')
 def get_strategies():
@@ -90,8 +112,8 @@ def execute_strategy(strategy_id):
     # Get the strategy class based on the strategy ID
     if strategy_id < 0 or strategy_id >= len(strategy_classes):
         return f"Invalid strategy ID: {strategy_id}"
-        
-    selected_strategy_class = strategy_classes[strategy_id]
+
+    selected_strategy_class = strategy_classes[strategy_id-1]
 
     # Get the input parameters from the query string
     start_date = request.args.get('startDate')
@@ -101,25 +123,20 @@ def execute_strategy(strategy_id):
     # Fetch stock data for the ticker
     stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
 
-    # Prepare the data for backtesting
-    data = pd.DataFrame.from_dict(stock_data, orient='index').astype(float)
-    data.index = pd.to_datetime(data.index)
-
     # Execute the strategy with the stock data
     bt = Backtest(stock_data, selected_strategy_class, cash=10000, commission=.002, exclusive_orders=True)
 
-    try:    
+    try:
         result = bt.run(stock_data)
         # Process the result as needed
-        return jsonify({'result': result})
+        return render_template('strategy_results.html', result=result)
     except Exception as e:
         return jsonify({'error': str(e)})
     
 ## FUNCTIONS
 # Check if the stock data exists in MongoDB, if not fetch from API and save to MongoDB
 def check_and_fetch_stock_data(ticker, end_date):
-    # Access the collection for the specific ticker
-    collection = client['stock_cache_db'][ticker]
+    collection = stock_cache_db[ticker]
 
     # Check if the data exists for the end date in the collection
     existing_data = collection.find_one({'date': end_date})
@@ -129,7 +146,7 @@ def check_and_fetch_stock_data(ticker, end_date):
     try:
         # Fetch stock data from the AlphaVantage API
         app = TimeSeries(ALPHAVANTAGE_KEY)
-        stock_data, meta_data = app.get_daily_adjusted(symbol=ticker, outputsize='full')
+        stock_data, _ = app.get_daily_adjusted(symbol=ticker, outputsize='full')
 
         # Convert stock_data to DataFrame
         df = pd.DataFrame.from_dict(stock_data, orient='index').astype(float)
@@ -143,7 +160,7 @@ def check_and_fetch_stock_data(ticker, end_date):
         client['stock_cache_db'].drop_collection(ticker)
 
         # Store the adjusted data in a new collection
-        collection.insert_many(adjusted_df.reset_index().to_dict(orient='records'))
+        collection.insert_many(adjusted_df.rename_axis('Date').reset_index().to_dict(orient='records'))
 
         return True  # Data fetched from API and saved to MongoDB
 
@@ -154,7 +171,7 @@ def check_and_fetch_stock_data(ticker, end_date):
 # Get the stock data from MongoDB
 def get_stock_data_from_mongodb(ticker, start_date, end_date):
     # Access the collection for the specific ticker
-    collection = client['stock_cache_db'][ticker]
+    collection = stock_cache_db[ticker]
 
     # Retrieve the stock data from MongoDB
     query = {'date': {'$gte': start_date, '$lte': end_date}}
@@ -162,14 +179,19 @@ def get_stock_data_from_mongodb(ticker, start_date, end_date):
     cursor = collection.find(query, projection)
 
     stock_data = {document['date']: {
-        'Open': document['open'],
-        'High': document['high'],
-        'Low': document['low'],
-        'Close': document['close'],
-        'Volume': document['volume']
+        'Open': document['Open'],
+        'High': document['High'],
+        'Low': document['Low'],
+        'Close': document['Close'],
+        'Volume': document['Volume']
     } for document in cursor}
 
-    return stock_data
+    # Prepare the data for backtesting
+    data = pd.DataFrame.from_dict(stock_data, orient='index').astype(float)
+    data.index = pd.to_datetime(data.index)
+    data = data.sort_index(ascending=True)
+
+    return data
 
 # Calculate the adjustment factor and create adjusted DataFrame
 def adjust_stock_data(df):

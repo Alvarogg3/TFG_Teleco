@@ -13,7 +13,7 @@
   <!-- Header -->
   <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <a class="navbar-brand" href="#">Trader Companion</a>
+      <a class="navbar-brand" href="/">Trader Companion</a>
       <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -29,9 +29,9 @@
 
   <!-- Main Content -->
   <main class="container">
-    <h1>Select Stocks</h1>
+    <h1 class="mt-4">Select Stocks</h1>
     <form id="main-form">
-  
+
       <!-- Date Period Selector -->
       <div class="form-group">
         <div class="row">
@@ -45,22 +45,18 @@
           </div>
         </div>
       </div>
-  
-      <!-- Ticker Boxes -->
-      <div class="ticker-boxes">
-        <div class="form-group">
-          <label for="ticker-input">Search Ticker:</label>
-          <div class="input-group">
-            <input type="text" class="form-control ticker-input" placeholder="Enter ticker" required>
+
+      <!-- Ticker Box -->
+      <div class="form-group">
+        <label for="ticker-input">Search Ticker:</label>
+        <div class="input-group">
+          <input type="text" class="form-control ticker-input" placeholder="Enter ticker" required>
+          <div class="input-group-append">
+            <button class="btn btn-primary info-btn">+info</button>
           </div>
         </div>
       </div>
-  
-      <!-- Add Ticker Button -->
-      <div class="form-group">
-        <button class="btn btn-primary" id="add-ticker-btn">Add Ticker</button>
-      </div>
-  
+
       <!-- Submit Button -->
       <div class="form-group">
         <button class="btn btn-success" id="submit-btn">Submit</button>
@@ -93,10 +89,10 @@
       startDateInput.setAttribute('max', today);
       endDateInput.setAttribute('max', today);
     });
-    
+
     document.addEventListener('DOMContentLoaded', function() {
       const tickerInput = document.querySelector('.ticker-input');
-      const addTickerButton = document.getElementById('add-ticker-btn');
+      const infoButton = document.querySelector('.info-btn');
       const submitButton = document.getElementById('submit-btn');
 
       // Autocomplete method
@@ -114,49 +110,25 @@
         }
       });
 
-      // Add and remove ticker buttons
-      addTickerButton.addEventListener('click', function() {
-        const newTickerBox = document.createElement('div');
-        newTickerBox.classList.add('form-group');
-        newTickerBox.innerHTML = `
-          <label for="ticker-input">Search Ticker:</label>
-          <div class="input-group">
-            <input type="text" class="form-control ticker-input" placeholder="Enter ticker" required>
-            <div class="input-group-append">
-              <button class="btn btn-danger remove-ticker-btn">Remove</button>
-            </div>
-          </div>
-        `;
-        document.querySelector('.ticker-boxes').appendChild(newTickerBox);
+      // Info button
+      infoButton.addEventListener('click', function() {
+        const ticker = extractTickerSymbol(tickerInput.value);
 
-        const removeButton = newTickerBox.querySelector('.remove-ticker-btn');
-        const tickerInput = newTickerBox.querySelector('.ticker-input');
-
-        $(tickerInput).typeahead({
-          minLength: 1,
-          highlight: true,
-          hint: true,
-          source: function(query, result) {
-            fetch(`/search_ticker?query=${query}`)
-              .then(response => response.json())
-              .then(data => {
-                const searchResults = data.map(result => result.symbol + ' - ' + result.name);
-                result(searchResults);
-              });
-          }
-        });
-
-        removeButton.addEventListener('click', function() {
-          newTickerBox.remove();
-        });
+        fetch(`/get_stock_info?ticker=${ticker}`)
+          .then(response => response.json())
+          .then(data => {
+            displayStockInfo(data);
+          })
+          .catch(error => {
+            console.error('Error:', error);
+          });
       });
 
       // Submit button
       submitButton.addEventListener('click', function() {
         const startDate = document.getElementById('start-date').value;
         const endDate = document.getElementById('end-date').value;
-        const tickers = document.querySelectorAll('.ticker-input');
-        const selectedTickers = Array.from(tickers).map(ticker => extractTickerSymbol(ticker.value));
+        const ticker = extractTickerSymbol(tickerInput.value);
 
         // The startDate must be lower than endDate
         if (startDate > endDate) {
@@ -173,50 +145,93 @@
           return;
         }
 
+        // Extract the strategy ID from the current URL
+        const urlParts = window.location.href.split('/');
+        const strategyId = urlParts[urlParts.length - 1];
+
         // Send the startDate, endDate, and selectedTickers to the backend
         fetch('/check_data_availability', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ endDate: endDate, tickers: selectedTickers })
+          body: JSON.stringify({ endDate: endDate, ticker: ticker }),
         })
-          .then(response => response.json())
-          .then(data => {
-            // Check for missing tickers
-            const missingTickers = data.missingTickers;
-            if (missingTickers.length > 0) {
-              alert('The following tickers have missing data: ' + missingTickers.join(', '));
-            } else {
-              // Get the strategy ID from the URL
-              const strategyId = parseInt(request.args.get('strategyId'));
-
-              // Construct the redirect URL based on the strategy ID
-              let redirectUrl = '';
-              if (strategyId === 0) {
-                redirectUrl = '/create_strategy';
-              } else if (strategyId > 0) {
-                redirectUrl = `/execute_strategy/${strategyId}`;
-              }
-
-              // Append the form values as query parameters to the redirect URL
-              redirectUrl += `?startDate=${startDate}&endDate=${endDate}&tickers=${selectedTickers.join(',')}`;
-
-              // Redirect the user to the appropriate page with the form values
-              window.location.href = redirectUrl;
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.error) {
+              alert(data.error);
+              return;
             }
+
+            // Get the strategy ID from the URL
+            const strategyId = parseInt(request.args.get('strategyId'));
+
+            // Construct the redirect URL based on the strategy ID
+            let redirectUrl = '';
+            if (strategyId === 0) {
+              redirectUrl = '/create_strategy';
+            } else if (strategyId > 0) {
+              redirectUrl = `/execute_strategy/${strategyId}`;
+
+              // Show the loading screen only for execute_strategy route
+              const loadingScreen = document.getElementById('loading-screen');
+              loadingScreen.style.display = 'block';
+            }
+
+            // Append the form values as query parameters to the redirect URL
+            redirectUrl += `?startDate=${startDate}&endDate=${endDate}&tickers=${selectedTickers.join(',')}`;
+
+            // Redirect the user to the appropriate page with the form values
+            window.location.href = redirectUrl;
           })
-          .catch(error => {
+          .catch((error) => {
             console.error('Error:', error);
           });
       });
-    }); 
-    
+    });
+
     // Function to extract ticker symbol
     function extractTickerSymbol(ticker) {
       return ticker.split(' - ')[0].trim();
     }
 
+    // Function to display stock information or error message
+    function displayStockInfo(data) {
+      const infoDiv = document.createElement('div');
+      
+      if (data.error) {
+        infoDiv.classList.add('alert', 'alert-danger');
+        infoDiv.textContent = data.error;
+      } else {
+        infoDiv.classList.add('stock-info');
+        infoDiv.innerHTML = `
+          <h4>${data.Symbol} - ${data.Name}</h4>
+          <p><strong>Asset Type:</strong> ${data.AssetType}</p>
+          <p><strong>Description:</strong> ${data.Description}</p>
+          <p><strong>CIK:</strong> ${data.CIK}</p>
+          <p><strong>Exchange:</strong> ${data.Exchange}</p>
+          <p><strong>Currency:</strong> ${data.Currency}</p>
+          <p><strong>Country:</strong> ${data.Country}</p>
+          <p><strong>Sector:</strong> ${data.Sector}</p>
+          <p><strong>Industry:</strong> ${data.Industry}</p>
+          <p><strong>Address:</strong> ${data.Address}</p>
+          <p><strong>Market Capitalization:</strong> ${data.MarketCapitalization}</p>
+          <p><strong>EPS:</strong> ${data.EPS}</p>
+          <p><strong>Revenue TTM:</strong> ${data.RevenueTTM}</p>
+          <!-- Add more information here -->
+        `;
+      }
+      
+      const mainForm = document.getElementById('main-form');
+      const existingInfoDiv = document.querySelector('.stock-info');
+      
+      if (existingInfoDiv) {
+        existingInfoDiv.remove();
+      }
+      
+      mainForm.insertAdjacentElement('afterend', infoDiv);
+    }
   </script>
 </body>
 </html>
