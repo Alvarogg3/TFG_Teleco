@@ -50,14 +50,14 @@
     <h1 class="mt-4">Strategy Results</h1>
 
     <div class="mt-5">
-        <!-- Display the plot using an iframe -->
-        <iframe id="plot-iframe" scrolling="no"></iframe>
+      <!-- Display the plot using an iframe -->
+      <iframe id="plot-iframe" scrolling="no"></iframe>
     </div>
 
     <div class="mt-5">
         <!-- Output data here -->
         <p id="output"></p>
-    </div>
+   </div>
 
     <div class="mt-5">
         <!-- Download buttons here -->
@@ -88,9 +88,11 @@
     const startDate = urlParams.get('startDate');
     const endDate = urlParams.get('endDate');
     const ticker = urlParams.get('ticker');
+    const frequency = urlParams.get('frequency');
+    const commission = urlParams.get('commission');
   
     // Fetch the strategy results
-    fetch(`/execute_strategy?strategyId=${strategyId}&startDate=${startDate}&endDate=${endDate}&ticker=${ticker}`)
+    fetch(`/execute_strategy?strategyId=${strategyId}&startDate=${startDate}&endDate=${endDate}&ticker=${ticker}&frequency=${frequency}&commission=${commission}`)
       .then((response) => response.json())
       .then((data) => {
         // Hide the loading screen
@@ -99,53 +101,81 @@
         // Show the main content
         document.querySelector('main').style.display = 'block';
 
-        // Display the output
-        const outputElement = document.getElementById('output');
-        const dataOutput = JSON.parse(data.output);
+        if (data.error) {
+          // Display error message
+          const errorDiv = document.createElement('div');
+          errorDiv.classList.add('alert', 'alert-danger');
+          errorDiv.textContent = data.error;
+          document.getElementById('output').appendChild(errorDiv);
 
-        // Create a container to hold the columns
-        const columnsContainer = document.createElement('div');
-        columnsContainer.classList.add('row');
+          // Hide the plot iframe
+          const plotIframe = document.getElementById('plot-iframe');
+          plotIframe.style.display = 'none';
+        } else {
 
-        // Calculate the number of keys per column
-        const keysPerColumn = Math.ceil(Object.keys(dataOutput).length / 3);
+          // Display the output
+          const outputElement = document.getElementById('output');
+          const dataOutput = JSON.parse(data.output);
 
-        // Iterate over the keys and create columns
-        let currentColumn;
-        let count = 0;
-        Object.entries(dataOutput).forEach(([key, value], index) => {
-        if (index % keysPerColumn === 0) {
-            // Create a new column
-            currentColumn = document.createElement('div');
-            currentColumn.classList.add('col');
-            columnsContainer.appendChild(currentColumn);
+          // Create a container to hold the output
+          const outputContainer = document.createElement('div');
+
+          // Create a title for the output
+          const titleElement = document.createElement('h3');
+          titleElement.textContent = 'Output Information';
+          titleElement.style.marginBottom = '20px'; // Add extra margin
+          outputContainer.appendChild(titleElement);
+
+          // Create a container to hold the columns
+          const columnsContainer = document.createElement('div');
+          columnsContainer.classList.add('row');
+
+          // Calculate the number of keys per column
+          const keysPerColumn = Math.ceil(Object.keys(dataOutput).length / 3);
+
+          // Iterate over the keys and create columns
+          let currentColumn;
+          let count = 0;
+          Object.entries(dataOutput).forEach(([key, value], index) => {
+          if (index % keysPerColumn === 0) {
+              // Create a new column
+              currentColumn = document.createElement('div');
+              currentColumn.classList.add('col');
+              columnsContainer.appendChild(currentColumn);
+          }
+
+          // Create a paragraph element for the key
+          const keyElement = document.createElement('p');
+          keyElement.innerHTML = `<strong>${key}:</strong>`;
+
+          // Create a paragraph element for the value
+          const valueElement = document.createElement('p');
+          valueElement.textContent = value;
+
+          // Append the key and value elements to the current column
+          currentColumn.appendChild(keyElement);
+          currentColumn.appendChild(valueElement);
+
+          count++;
+          });
+
+          // Append the columns to the output container
+          outputContainer.appendChild(columnsContainer);
+
+          // Append the output container to the output element
+          outputElement.appendChild(outputContainer);
+
+          // Load the plot in the iframe
+          const plotIframe = document.getElementById('plot-iframe');
+          plotIframe.src = `../${data.plot_filename}`;  // Add `../` to the path
         }
-
-        // Create a paragraph element for the key
-        const keyElement = document.createElement('p');
-        keyElement.innerHTML = `<strong>${key}:</strong>`;
-
-        // Create a paragraph element for the value
-        const valueElement = document.createElement('p');
-        valueElement.textContent = value;
-
-        // Append the key and value elements to the current column
-        currentColumn.appendChild(keyElement);
-        currentColumn.appendChild(valueElement);
-
-        count++;
-        });
-
-        // Append the columns to the output container
-        outputElement.appendChild(columnsContainer);
-
-
-        // Load the plot in the iframe
-        const plotIframe = document.getElementById('plot-iframe');
-        plotIframe.src = `../${data.plot_filename}`;  // Add `../` to the path
       })
       .catch((error) => {
-        console.error('Error:', error);
+          // Display error message
+          const errorDiv = document.createElement('div');
+          errorDiv.classList.add('alert', 'alert-danger');
+          errorDiv.textContent = data.error;
+          document.getElementById('output').appendChild(errorDiv);
       });
   </script>
 </body>

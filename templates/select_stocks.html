@@ -182,6 +182,10 @@
         const url = new URL(window.location.href);
         const strategyId = parseInt(url.pathname.split('/').pop()) || 0;
 
+        // Extract the frequency and commission from the form
+        const frequency = parseInt(document.getElementById('frequency').value) || 1;
+        const commission = parseFloat(document.getElementById('commission').value) / 100 || 0.002;
+
         // Send the startDate, endDate, and ticker to the backend
         fetch('/check_data_availability', {
           method: 'POST',
@@ -203,6 +207,8 @@
               url.searchParams.append('startDate', startDate);
               url.searchParams.append('endDate', endDate);
               url.searchParams.append('ticker', ticker);
+              url.searchParams.append('frequency', frequency);
+              url.searchParams.append('commission', commission);
               window.location.href = url;
             }
           })

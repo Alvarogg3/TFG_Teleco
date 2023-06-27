@@ -69,9 +69,13 @@ def display_results():
   start_date = request.args.get('startDate')
   end_date = request.args.get('endDate')
   ticker = request.args.get('ticker')
+  frequency = request.args.get('frequency')
+  commission = request.args.get("commission")
 
   # Pass the parameters to the strategy_results.html template
-  return render_template('strategy_results.html', strategy_id=strategy_id, start_date=start_date, end_date=end_date, ticker=ticker)
+  return render_template('strategy_results.html', 
+                         strategy_id=strategy_id, start_date=start_date, end_date=end_date, 
+                         ticker=ticker, frequency=frequency, commission=commission)
 
 ## METHODS
 @app.route('/search_ticker')
@@ -125,6 +129,8 @@ def execute_strategy():
     start_date = request.args.get('startDate')
     end_date = request.args.get('endDate')
     ticker = request.args.get('ticker')
+    frequency = int(request.args.get('frequency'))
+    commission = float(request.args.get("commission"))
 
     # Get the strategy class based on the strategy ID
     if strategy_id < 0 or strategy_id >= len(strategy_classes):
@@ -135,19 +141,25 @@ def execute_strategy():
     # Get stock data for the ticker from MongoDB
     stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
 
+    # Resample to correct freuency
+    data =  stock_data.iloc[::frequency]
+
     # Execute the strategy with the stock data
-    bt = Backtest(stock_data, selected_strategy_class, cash=10000, commission=.002, exclusive_orders=True)
+    bt = Backtest(data, selected_strategy_class, cash=10000, commission=commission, exclusive_orders=True)
 
     try:
         result = bt.run()
-        # Generate the plot and save it as HTML
-        plot_filename = f"static/html_outputs/{selected_strategy_class.__name__}.html"
-        bt.plot(filename=plot_filename, open_browser=False)
-        # Pass the plot filename and strategy results
-        return jsonify({'output': json.dumps(result[:-3].to_dict(), indent=4, default=str), 'plot_filename': plot_filename})   
+        if result["# Trades"] > 1:
+            # Generate the plot and save it as HTML
+            plot_filename = f"static/html_outputs/{selected_strategy_class.__name__}.html"
+            bt.plot(filename=plot_filename, open_browser=False)
+            # Pass the plot filename and strategy results
+            return jsonify({'output': json.dumps(result[:-3].to_dict(), indent=4, default=str), 'plot_filename': plot_filename}) 
+        else: 
+            return jsonify({'error': 'There are not enough trades for this strategy.'}), 404
     except Exception as e:
         # Return an error message
-        return jsonify({'error': 'Error executing strategy.'}), 500
+        return jsonify({'error': 'Error executing strategy.'}), 404
     
 @app.route('/html_outputs/<path:filename>')
 def serve_output(filename):
