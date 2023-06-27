@@ -11,19 +11,32 @@
   <!-- Header -->
   <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <a class="navbar-brand" href="/">Trader Companion</a>
+      <a class="navbar-brand" href="#">Trader Companion</a>
       <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
         <ul class="navbar-nav">
-          <li class="nav-item">
-            <a class="nav-link" href="#">Login</a>
-          </li>
+          {% if session['username'] %}
+            <li class="nav-item mr-5">
+              <a class="nav-link font-weight-bold" href="/backtests">{{ session['username']|capitalize }}'s Backtests</a>
+            </li>
+            <li class="nav-item mr-5">
+              <a class="nav-link" href="/logout">Logout</a>
+            </li>
+          {% else %}
+            <li class="nav-item mr-5">
+              <a class="nav-link font-weight-bold" href="/login">Login</a>
+            </li>
+            <li class="nav-item mr-5">
+              <a class="nav-link" href="/signup">Signup</a>
+            </li>
+          {% endif %}
         </ul>
       </div>
     </nav>
   </header>
+
 
   <!-- Main Content -->
   <main class="container">
@@ -51,6 +64,14 @@
       window.location.href = `/select_stocks/${strategyId}`;
     }
 
+    // Function to download the Python module
+    function downloadStrategy(strategyId) {
+      const link = document.createElement('a');
+      link.href = `/download_strategy/${strategyId}`; // Replace with your API endpoint to download the strategy module
+      link.download = `${strategyId}.py`; // Set the filename of the downloaded file
+      link.click();
+    }
+
     // Function to fetch and display strategies
     async function fetchStrategies() {
       try {
@@ -65,9 +86,10 @@
               <div class="card">
                 <img class="card-img-top" src="../static/images/strategies.jpg" alt="Strategy Image">
                 <div class="card-body">
-                  <h5 class="card-title">${strategy.strategy_name}</h5>
+                  <h5 class="card-title">${strategy.strategy_id}</h5>
                   <p class="card-text">${strategy.description}</p>
                   <a href="/select_stocks/${strategy.strategy_id}" class="btn btn-primary">Test Strategy</a>
+                  <a href="/download_strategy/${strategy.strategy_id}.py" class="btn btn-secondary">Download Code</a>
                 </div>
               </div>
             </div>

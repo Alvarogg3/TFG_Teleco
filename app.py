@@ -1,7 +1,7 @@
 ## LIBRARIES
 # Framework
-from flask import Flask, render_template, jsonify, redirect, url_for, send_from_directory, send_file, request
- 
+from flask import Flask, render_template, jsonify, redirect, url_for, send_from_directory, send_file, request, session
+
 # Data API
 from alpha_vantage.timeseries import TimeSeries
 # Database
@@ -10,15 +10,17 @@ from pymongo import MongoClient
 import pandas as pd
 import requests
 import json
-import os
+import bcrypt
 import io
 
 # Backtesting
 from backtesting import Backtest, Strategy
-# Custom module
-from importlib import import_module
+# Custom module import
+import os
+import pkgutil
 import inspect
-from modules.default_strategies import *
+from importlib import import_module
+
 
 ## ALPHAVANTAGE API KEYS
 # Load the keys from the json file
@@ -29,10 +31,23 @@ ALPHAVANTAGE_KEY = keys_data['ALPHAVANTAGE_KEY']
 ALPHAVANTAGE_KEY_2 = keys_data['ALPHAVANTAGE_KEY_2']
 
 ## STRATEGY METHODS
-# Get the strategies module dynamically
-strategies_module = import_module('modules.default_strategies')
-# Get all classes from the strategies module in the order they appear in the file
-strategy_classes = [cls for name, cls in inspect.getmembers(strategies_module, inspect.isclass) if issubclass(cls, Strategy) and cls.__module__ == strategies_module.__name__]
+# Get the directory where the strategy modules are located
+modules_dir = 'modules'
+
+# Create an empty dictionary to store the strategy classes
+strategy_classes = {}
+
+# Iterate over the strategy modules in the directory
+for _, module_name, _ in pkgutil.iter_modules([modules_dir]):
+    # Import the strategy module dynamically
+    module = import_module(f'{modules_dir}.{module_name}')
+
+    # Get the strategy class from the module
+    strategy_class = next((cls for _, cls in inspect.getmembers(module, inspect.isclass) if issubclass(cls, Strategy)), None)
+
+    # Add the strategy class to the dictionary with the module name as key
+    if strategy_class is not None:
+        strategy_classes[module_name] = strategy_class
 
 ## DATABASE
 # Establish a connection to MongoDB
@@ -43,17 +58,32 @@ stock_cache_db = client['stock_cache_db']
 
 # Access the collection for the strategies info
 db = client['strategies']
-dfstrat_collection = db['default_strategies']
+strategies_collection = db['default_strategies']
+
+# Access the collection for the users
+db = client['user_database']
+users_collection = db['users']
 
 ## FLASK APP
 app = Flask(__name__)
+
+# Load configuration from JSON file
+with open('static/config.json', 'r') as config_file:
+    config_data = json.load(config_file)
+
+app.config['SECRET_KEY'] = config_data['SECRET_KEY']
+app.config['SESSION_COOKIE_SECURE'] = config_data['SESSION_COOKIE_SECURE']
+app.config['SESSION_COOKIE_HTTPONLY'] = config_data['SESSION_COOKIE_HTTPONLY']
+app.config['SESSION_COOKIE_SAMESITE'] = config_data['SESSION_COOKIE_SAMESITE']
+app.config['PERMANENT_SESSION_LIFETIME'] = config_data['PERMANENT_SESSION_LIFETIME']  # 1 week in seconds
+app.permanent_session_lifetime = app.config['PERMANENT_SESSION_LIFETIME']
 
 ## ROUTES
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/select_stocks/<int:id>')
+@app.route('/select_stocks/<string:id>')
 def select_stocks(id):
     # Logic for rendering the create strategy page with the provided strategy ID
     return render_template('select_stocks.html', strategy_id=id)
@@ -71,13 +101,78 @@ def display_results():
   ticker = request.args.get('ticker')
   frequency = request.args.get('frequency')
   commission = request.args.get("commission")
+  print(strategy_id)
 
   # Pass the parameters to the strategy_results.html template
   return render_template('strategy_results.html', 
                          strategy_id=strategy_id, start_date=start_date, end_date=end_date, 
                          ticker=ticker, frequency=frequency, commission=commission)
 
-## METHODS
+## AUTHENTICATION METHODS
+# Render Signup Form
+@app.route('/signup', methods=['GET'])
+def render_signup_form():
+    return render_template('signup.html')
+
+# Handle Signup Form Submission
+@app.route('/signup', methods=['POST'])
+def handle_signup_form():
+    username = request.form['username']
+    password = request.form['password']
+
+    # Check if the username already exists in the collection
+    if users_collection.find_one({'username': username}):
+        return render_template('signup.html', error='Username already exists. Please choose another.')
+
+    # Hash the password
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+    # Store the user credentials in the collection
+    users_collection.insert_one({'username': username, 'password': hashed_password})
+
+    session['username'] = username
+    return redirect(url_for('index'))
+
+# Render Login Form
+@app.route('/login', methods=['GET'])
+def render_login_form():
+    return render_template('login.html')
+
+# Handle Login Form Submission
+@app.route('/login', methods=['POST'])
+def handle_login_form():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        # Retrieve the user from the collection based on the username
+        user = users_collection.find_one({'username': username})
+        if user:
+            # Check if the password matches the stored hashed password
+            if bcrypt.checkpw(password.encode('utf-8'), user['password']):
+                session['username'] = username
+                return redirect(url_for('index'))
+
+        error = 'Invalid credentials. Please try again.'
+        return render_template('login.html', error=error)
+
+    return render_template('login.html')
+
+# Logout Route
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
+
+# Protected Route
+@app.route('/protected')
+def protected():
+    if 'username' in session:
+        username = session['username']
+        return f'Welcome, {username}!'
+    return redirect(url_for('login'))
+
+## GENERAL METHODS
 @app.route('/search_ticker')
 def search_ticker():
     query = request.args.get('query')
@@ -111,21 +206,32 @@ def check_data_availability():
 
 @app.route('/get_strategies')
 def get_strategies():
-    # Establish a connection to MongoDB
-    client = MongoClient('mongodb://localhost:27017/')
+    # Get strategies for all users
+    strategies = strategies_collection.find({"users": "all"}, {"_id": 0})  # Exclude the _id field from the result
 
-    # Access the collection for the strategies
-    db = client['strategies']
-    dfstrat_collection = db['default_strategies']
-
-    strategies = dfstrat_collection.find({}, {"_id": 0})  # Exclude the _id field from the result
     return jsonify(list(strategies))
+
+# Download the strategy code to practice
+@app.route('/download_strategy/<string:strategyFilename>')
+def download_strategy(strategyFilename):
+    # Logic to locate and retrieve the strategy module file based on the strategyId
+
+    # Assuming the strategy modules are stored in the `strategy_modules` directory
+    strategy_file_path = f'modules/{strategyFilename}'
+    print(strategy_file_path)
+
+    try:
+        # Send the strategy module file as a download
+        return send_file(strategy_file_path, as_attachment=True,  download_name=strategyFilename)
+    except Exception as e:
+        # Handle the case if the strategy module file is not found or any other error occurs
+        return jsonify({'error': str(e)}), 404
 
 # Execute a trading strategy
 @app.route('/execute_strategy', methods=['GET'])
 def execute_strategy():
     # Get the input parameters from the query string
-    strategy_id = int(request.args.get('strategyId'))
+    strategy_id = request.args.get('strategyId')
     start_date = request.args.get('startDate')
     end_date = request.args.get('endDate')
     ticker = request.args.get('ticker')
@@ -133,10 +239,9 @@ def execute_strategy():
     commission = float(request.args.get("commission"))
 
     # Get the strategy class based on the strategy ID
-    if strategy_id < 0 or strategy_id >= len(strategy_classes):
+    selected_strategy_class = strategy_classes.get(strategy_id)
+    if strategy_class is None:
         return jsonify({'error': f"Invalid strategy ID: {strategy_id}"}), 404
-
-    selected_strategy_class = strategy_classes[strategy_id - 1]
 
     # Get stock data for the ticker from MongoDB
     stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
