@@ -102,11 +102,19 @@ def display_results():
   frequency = request.args.get('frequency')
   commission = request.args.get("commission")
   print(strategy_id)
-
   # Pass the parameters to the strategy_results.html template
   return render_template('strategy_results.html', 
                          strategy_id=strategy_id, start_date=start_date, end_date=end_date, 
                          ticker=ticker, frequency=frequency, commission=commission)
+
+# Protected Route - Backend
+@app.route('/backtests')
+def backtests_library():
+    if 'username' in session:
+        # Only allow access for authenticated users
+        return render_template('backtests.html')
+    else:
+        return render_template('login.html')
 
 ## AUTHENTICATION METHODS
 # Render Signup Form
