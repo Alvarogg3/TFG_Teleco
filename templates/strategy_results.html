@@ -6,9 +6,24 @@
   <title>Trader Companion - Strategy Results</title>
   <!-- Include Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <style>
+    /* Add loading screen styles here */
+    .loading-screen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    /* Adjust the iframe size */
+    #plot-iframe {
+      width: 100%;
+      height: 105vh;
+      border: none;
+    }
+  </style>
 </head>
 <body>
-  <!-- Header -->
+      <!-- Header -->
   <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <a class="navbar-brand" href="/">Trader Companion</a>
@@ -25,38 +40,113 @@
     </nav>
   </header>
 
-  <!-- Main Content -->
-  <main class="container">
+  <!-- Loading Screen -->
+  <div class="loading-screen">
+    <h2>Running Strategy...</h2>
+  </div>
+
+  <!-- Main Content (hidden by default) -->
+  <main class="container" style="display: none;">
     <h1 class="mt-4">Strategy Results</h1>
 
     <div class="mt-5">
-        <!-- Output data here -->
-        <p>{{ output[:-3] }}</p>
+        <!-- Display the plot using an iframe -->
+        <iframe id="plot-iframe" scrolling="no"></iframe>
     </div>
 
     <div class="mt-5">
-        <!-- Display the plot using an iframe -->
-        <iframe src="{{ plot_filename }}" width="800" height="600"></iframe>
+        <!-- Output data here -->
+        <p id="output"></p>
     </div>
 
     <div class="mt-5">
         <!-- Download buttons here -->
-        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='output', output=output[:-3]) }}" class="btn btn-primary">Download Output</a>
-        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='equity_curve', equity_curve=output[-2]) }}" class="btn btn-primary">Download Equity Curve</a>
-        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades', trades=output[-1]) }}" class="btn btn-primary">Download Trades</a>
+        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='output') }}" class="btn btn-secondary mr-4">Download Output in Excel</a>
+        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='equity_curve') }}" class="btn btn-secondary mx-4">Download Graph in HTML</a>
+        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades') }}" class="btn btn-success mx-4">Save Backtest</a>
+        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades') }}" class="btn btn-primary ml-4">Optimize Strategy</a>
     </div>
   </main>
 
-  <!-- Footer -->
-  <footer class="footer bg-dark text-white text-center py-3 mt-5">
+   <!-- Footer -->
+   <footer class="footer bg-dark text-white text-center py-3 mt-5">
     <div class="container">
       <span>&copy; 2023 Trader Companion. All rights reserved.</span>
     </div>
   </footer>
-
+  
   <!-- Include Bootstrap JS -->
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    // Display the loading screen
+    document.querySelector('.loading-screen').style.display = 'flex';
+  
+    // Get the parameters from the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const strategyId = urlParams.get('strategyId');
+    const startDate = urlParams.get('startDate');
+    const endDate = urlParams.get('endDate');
+    const ticker = urlParams.get('ticker');
+  
+    // Fetch the strategy results
+    fetch(`/execute_strategy?strategyId=${strategyId}&startDate=${startDate}&endDate=${endDate}&ticker=${ticker}`)
+      .then((response) => response.json())
+      .then((data) => {
+        // Hide the loading screen
+        document.querySelector('.loading-screen').style.display = 'none';
+  
+        // Show the main content
+        document.querySelector('main').style.display = 'block';
+
+        // Display the output
+        const outputElement = document.getElementById('output');
+        const dataOutput = JSON.parse(data.output);
+
+        // Create a container to hold the columns
+        const columnsContainer = document.createElement('div');
+        columnsContainer.classList.add('row');
+
+        // Calculate the number of keys per column
+        const keysPerColumn = Math.ceil(Object.keys(dataOutput).length / 3);
+
+        // Iterate over the keys and create columns
+        let currentColumn;
+        let count = 0;
+        Object.entries(dataOutput).forEach(([key, value], index) => {
+        if (index % keysPerColumn === 0) {
+            // Create a new column
+            currentColumn = document.createElement('div');
+            currentColumn.classList.add('col');
+            columnsContainer.appendChild(currentColumn);
+        }
+
+        // Create a paragraph element for the key
+        const keyElement = document.createElement('p');
+        keyElement.innerHTML = `<strong>${key}:</strong>`;
+
+        // Create a paragraph element for the value
+        const valueElement = document.createElement('p');
+        valueElement.textContent = value;
+
+        // Append the key and value elements to the current column
+        currentColumn.appendChild(keyElement);
+        currentColumn.appendChild(valueElement);
+
+        count++;
+        });
+
+        // Append the columns to the output container
+        outputElement.appendChild(columnsContainer);
+
+
+        // Load the plot in the iframe
+        const plotIframe = document.getElementById('plot-iframe');
+        plotIframe.src = `../${data.plot_filename}`;  // Add `../` to the path
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+      });
+  </script>
 </body>
 </html>

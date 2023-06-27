@@ -46,6 +46,20 @@
         </div>
       </div>
 
+      <!-- Additional Inputs -->
+      <div class="form-group">
+        <div class="row">
+          <div class="col">
+            <label for="frequency">Frequency (in days):</label>
+            <input type="number" class="form-control" id="frequency" name="frequency" min="1" step="1" value="1">
+          </div>
+          <div class="col">
+            <label for="commission">Commission (%):</label>
+            <input type="number" class="form-control" id="commission" name="commission" min="0" step="0.01" value="0.2">
+          </div>
+        </div>
+      </div>
+
       <!-- Ticker Box -->
       <div class="form-group">
         <label for="ticker-input">Search Ticker:</label>
@@ -65,6 +79,17 @@
         <button type="submit" class="btn btn-success" id="submit-btn">Submit</button>
       </div>
     </form>
+
+     <!-- Loading Animation -->
+     <div id="loading-animation" style="display: none;">
+      <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+      <p>Executing strategy...</p>
+    </div>
+
+    <!-- Error Message -->
+    <div id="error-message" style="display: none;" class="alert alert-danger"></div>
   </main>
 
   <!-- Footer -->
@@ -98,6 +123,8 @@
       const infoButton = document.querySelector('.info-btn');
       const submitButton = document.getElementById('submit-btn');
       const stockInfoDiv = document.getElementById('stock-info');
+      const loadingAnimation = document.getElementById('loading-animation'); // Add this line
+      const errorMessage = document.getElementById('error-message');
 
       // Autocomplete method
       $(tickerInput).typeahead({
@@ -161,36 +188,23 @@
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ strategyId: strategyId, startDate: startDate, endDate: endDate, ticker: ticker }),
+          body: JSON.stringify({endDate: endDate, ticker: ticker }),
         })
           .then((response) => response.json())
           .then((data) => {
             if (data.error) {
-              alert(data.error);
-              return;
+              // Display the error message
+              errorMessage.textContent = data.error;
+              errorMessage.style.display = 'block';
+            } else {
+              // Redirect to the strategy_results page with the parameters
+              const url = new URL('/display_results', window.location.origin);
+              url.searchParams.append('strategyId', strategyId);
+              url.searchParams.append('startDate', startDate);
+              url.searchParams.append('endDate', endDate);
+              url.searchParams.append('ticker', ticker);
+              window.location.href = url;
             }
-
-            // Extract the strategy ID from the current URL
-            const url = new URL(window.location.href);
-            const strategyId = parseInt(url.pathname.split('/').pop()) || 0;
-
-            // Construct the redirect URL based on the strategy ID
-            let redirectUrl = '';
-            if (strategyId === 0) {
-              redirectUrl = '/create_strategy';
-            } else if (strategyId > 0) {
-              redirectUrl = `/execute_strategy/${strategyId}`;
-
-              // Show the loading screen only for execute_strategy route
-              const loadingScreen = document.getElementById('loading-screen');
-              loadingScreen.style.display = 'block';
-            }
-
-            // Append the form values as query parameters to the redirect URL
-            redirectUrl += `?startDate=${startDate}&endDate=${endDate}&ticker=${ticker}`;
-
-            // Redirect the user to the appropriate page with the form values
-            window.location.href = redirectUrl;
           })
           .catch((error) => {
             console.error('Error:', error);

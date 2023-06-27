@@ -1,6 +1,6 @@
 ## LIBRARIES
 # Framework
-from flask import Flask, render_template, jsonify, redirect, send_from_directory, send_file, request
+from flask import Flask, render_template, jsonify, redirect, url_for, send_from_directory, send_file, request
  
 # Data API
 from alpha_vantage.timeseries import TimeSeries
@@ -63,6 +63,16 @@ def check_strategies():
     # Logic for rendering the test strategy page
     return render_template('check_strategies.html')
 
+@app.route('/display_results', methods=['GET'])
+def display_results():
+  strategy_id = request.args.get('strategyId')
+  start_date = request.args.get('startDate')
+  end_date = request.args.get('endDate')
+  ticker = request.args.get('ticker')
+
+  # Pass the parameters to the strategy_results.html template
+  return render_template('strategy_results.html', strategy_id=strategy_id, start_date=start_date, end_date=end_date, ticker=ticker)
+
 ## METHODS
 @app.route('/search_ticker')
 def search_ticker():
@@ -90,10 +100,10 @@ def check_data_availability():
     end_date = request.json['endDate']
     ticker = request.json['ticker']
 
-    if not check_and_fetch_stock_data(ticker, end_date):
+    if not check_and_save_stock_data(ticker, end_date):
         return jsonify({'error': f'Ticker "{ticker}" not found.'}), 404
     else:
-        return ticker
+        return jsonify({'success': True})
 
 @app.route('/get_strategies')
 def get_strategies():
@@ -107,21 +117,20 @@ def get_strategies():
     strategies = dfstrat_collection.find({}, {"_id": 0})  # Exclude the _id field from the result
     return jsonify(list(strategies))
 
-@app.route('/execute_strategy/<int:strategy_id>')
-def execute_strategy(strategy_id):
-    # Retrieve the strategy from the MongoDB collection
-    strategy_id = int(request.json['strategy_id'])
-
-    # Get the strategy class based on the strategy ID
-    if strategy_id < 0 or strategy_id >= len(strategy_classes):
-        return f"Invalid strategy ID: {strategy_id}"
-
-    selected_strategy_class = strategy_classes[strategy_id]
-
+# Execute a trading strategy
+@app.route('/execute_strategy', methods=['GET'])
+def execute_strategy():
     # Get the input parameters from the query string
+    strategy_id = int(request.args.get('strategyId'))
     start_date = request.args.get('startDate')
     end_date = request.args.get('endDate')
     ticker = request.args.get('ticker')
+
+    # Get the strategy class based on the strategy ID
+    if strategy_id < 0 or strategy_id >= len(strategy_classes):
+        return jsonify({'error': f"Invalid strategy ID: {strategy_id}"}), 404
+
+    selected_strategy_class = strategy_classes[strategy_id - 1]
 
     # Get stock data for the ticker from MongoDB
     stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
@@ -130,16 +139,15 @@ def execute_strategy(strategy_id):
     bt = Backtest(stock_data, selected_strategy_class, cash=10000, commission=.002, exclusive_orders=True)
 
     try:
-        result = bt.run(stock_data)
-
+        result = bt.run()
         # Generate the plot and save it as HTML
         plot_filename = f"static/html_outputs/{selected_strategy_class.__name__}.html"
         bt.plot(filename=plot_filename, open_browser=False)
-
-        # Pass the plot filename and strategy results to the template
-        return render_template('strategy_results.html', output=result, plot_filename=plot_filename, strategy_id=strategy_id)
+        # Pass the plot filename and strategy results
+        return jsonify({'output': json.dumps(result[:-3].to_dict(), indent=4, default=str), 'plot_filename': plot_filename})   
     except Exception as e:
-        return jsonify({'error': str(e)})
+        # Return an error message
+        return jsonify({'error': 'Error executing strategy.'}), 500
     
 @app.route('/html_outputs/<path:filename>')
 def serve_output(filename):
@@ -188,8 +196,20 @@ def download_data():
     return send_file(filename, as_attachment=True)
     
 ## FUNCTIONS
+# Calculate the adjustment factor and create adjusted DataFrame
+def adjust_stock_data(df):
+    df['factor'] = df['4. close'] / df['5. adjusted close']
+    adjusted_df = pd.DataFrame({
+        'Open': df['1. open'] / df['factor'],
+        'High': df['2. high'] / df['factor'],
+        'Low': df['3. low'] / df['factor'],
+        'Close': df['4. close'] / df['factor'],
+        'Volume': df['6. volume'] * df['factor']
+    })
+    return adjusted_df
+
 # Check if the stock data exists in MongoDB, if not fetch from API and save to MongoDB
-def check_and_fetch_stock_data(ticker, end_date):
+def check_and_save_stock_data(ticker, end_date):
     collection = stock_cache_db[ticker]
 
     # Check if the data exists for the end date in the collection
@@ -231,11 +251,11 @@ def get_stock_data_from_mongodb(ticker, start_date, end_date):
     collection = stock_cache_db[ticker]
 
     # Retrieve the stock data from MongoDB
-    query = {'date': {'$gte': start_date, '$lte': end_date}}
-    projection = {'_id': 0, 'date': 1, 'open': 1, 'high': 1, 'low': 1, 'close': 1, 'volume': 1}
+    query = {'Date': {'$gte': start_date, '$lte': end_date}}
+    projection = {'_id': 0, 'Date': 1, 'Open': 1, 'High': 1, 'Low': 1, 'Close': 1, 'Volume': 1}
     cursor = collection.find(query, projection)
 
-    stock_data = {document['date']: {
+    stock_data = {document['Date']: {
         'Open': document['Open'],
         'High': document['High'],
         'Low': document['Low'],
@@ -249,18 +269,6 @@ def get_stock_data_from_mongodb(ticker, start_date, end_date):
     data = data.sort_index(ascending=True)
 
     return data
-
-# Calculate the adjustment factor and create adjusted DataFrame
-def adjust_stock_data(df):
-    df['factor'] = df['4. close'] / df['5. adjusted close']
-    adjusted_df = pd.DataFrame({
-        'Open': df['1. open'] / df['factor'],
-        'High': df['2. high'] / df['factor'],
-        'Low': df['3. low'] / df['factor'],
-        'Close': df['4. close'] / df['factor'],
-        'Volume': df['6. volume'] * df['factor']
-    })
-    return adjusted_df
 
 if __name__ == '__main__':
     app.run(debug=True)
