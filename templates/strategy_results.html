@@ -317,8 +317,14 @@
         })
           .then(response => response.json())
           .then(result => {
-            if (result.success) {
+            if (result.backtestId) {
               alert('Backtest saved successfully.');
+              // Get the current URL
+              const url = new URL(window.location.href);
+              // Set the backtestId parameter to the new value
+              url.searchParams.set('backtestId', result.backtestId);
+              // Redirect to the updated URL
+              window.location.href = url.href;
             } else {
               alert('Error saving the Backtest.');
             }
@@ -337,7 +343,7 @@
     const downloadExcel = async () => {
       {% if session['username'] %}
         try {
-          const response = await fetch(`/download_data?strategy_id=${strategyId}`);
+          const response = await fetch(`/download_data?strategy_id=${strategyId}&backtestId=${backtestId}`);
           const blob = await response.blob();
 
           // Create a temporary link element

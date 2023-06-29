@@ -348,8 +348,6 @@ def save_backtest():
     strategy_id = data.get('strategyId')
     old_backtest_name = data.get('backtestID')
 
-    print(old_backtest_name)
-
     # Generate the new Backtest name
     username = session['username']
     if old_backtest_name == "":
@@ -363,7 +361,7 @@ def save_backtest():
 
     if result.modified_count > 0:
         # Redirect to the display_results route with the updated backtest_id parameter
-        return redirect(url_for('display_results', backtestId=backtest_name))
+        return jsonify({"backtestId": backtest_name})
     else:
         return jsonify({'error': 'Failed to update the Backtest name.'}), 500
     
@@ -373,7 +371,11 @@ def download_data():
     if 'username' in session:
         username = session['username']
         strategy_id = request.args.get('strategy_id')
-        backtest_name = f"{username}_{strategy_id}"
+        backtest_name = request.args.get('backtestId')
+
+        # Check if the strategy is not saved
+        if backtest_name == "":
+            backtest_name = f"{username}_{strategy_id}"
 
         # Fetch the bt object from MongoDB
         bt_document = bt_collection.find_one({'name': backtest_name})

@@ -2,7 +2,7 @@ from backtesting import Strategy
 from backtesting.lib import crossover
 import talib as ta
 
-class MACD(Strategy):
+class MovingAverageConvergenceDivergence(Strategy):
     fast_period = 50
     slow_period = 150
     signal_period = 50
