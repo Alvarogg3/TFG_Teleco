@@ -60,25 +60,40 @@
 
   <!-- Main Content (hidden by default) -->
   <main class="container" style="display: none;">
-    <h1 class="mt-4">Strategy Results</h1>
+    <h1 class="mt-4">Strategy Results - {{ strategy_id }} on {{ticker}}</h1>
 
     <div class="mt-5">
+      <!-- Key indicators data here -->
+      <p id="key_indicators"></p>
+    </div>
+
+    <div class="mt-3">
       <!-- Display the plot using an iframe -->
       <iframe id="plot-iframe" scrolling="no"></iframe>
     </div>
 
     <div class="mt-5">
-        <!-- Output data here -->
-        <p id="output"></p>
-   </div>
+      <!-- Saving and optimize buttons here -->
+      <div class="mt-5">
+        <div class="d-flex align-items-center">
+          <button onclick="downloadIframeContent()" class="btn btn-secondary mr-4">Download Graph in HTML</button>
+          <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades') }}" class="btn btn-primary mx-4">Optimize Strategy</a>
+          <div class="ml-4">
+            <button class="btn btn-success " onclick="saveBacktestName()">Save Backtest</button>
+          </div>
+          <div>
+            <input type="text" id="backtest-name-input" class="form-control" placeholder="Backtest Name">
+          </div>
+        </div>
+      </div>
 
     <div class="mt-5">
+        <!-- Output data here --> 
+        <p id="output"></p>
         <!-- Download buttons here -->
-        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='output') }}" class="btn btn-secondary mr-4">Download Output in Excel</a>
-        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='equity_curve') }}" class="btn btn-secondary mx-4">Download Graph in HTML</a>
-        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades') }}" class="btn btn-success mx-4">Save Backtest</a>
-        <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades') }}" class="btn btn-primary ml-4">Optimize Strategy</a>
-    </div>
+        <button id="download-excel-btn" class="btn btn-secondary">Download All Statistics in Excel</button>
+
+   </div>
   </main>
 
    <!-- Footer -->
@@ -103,93 +118,251 @@
     const ticker = urlParams.get('ticker');
     const frequency = urlParams.get('frequency');
     const commission = urlParams.get('commission');
+    const backtestId = urlParams.get('backtestId');
   
     // Fetch the strategy results
-    fetch(`/execute_strategy?strategyId=${strategyId}&startDate=${startDate}&endDate=${endDate}&ticker=${ticker}&frequency=${frequency}&commission=${commission}`)
-      .then((response) => response.json())
-      .then((data) => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch(`/execute_strategy?strategyId=${strategyId}&startDate=${startDate}&endDate=${endDate}&ticker=${ticker}&frequency=${frequency}&commission=${commission}&backtestId=${backtestId}`);
+        const data = await response.json();
+
         // Hide the loading screen
-        document.querySelector('.loading-screen').style.display = 'none';
-  
+        const loadingScreen = document.querySelector('.loading-screen');
+        loadingScreen.style.display = 'none';
+
         // Show the main content
-        document.querySelector('main').style.display = 'block';
+        const mainContent = document.querySelector('main');
+        mainContent.style.display = 'block';
+
+        // Obtain the key indicators and the output element
+        const keyIndicatorElement = document.getElementById('key_indicators');
+        const outputElement = document.getElementById('output');
 
         if (data.error) {
           // Display error message
           const errorDiv = document.createElement('div');
           errorDiv.classList.add('alert', 'alert-danger');
           errorDiv.textContent = data.error;
-          document.getElementById('output').appendChild(errorDiv);
+          keyIndicatorElement.appendChild(errorDiv);
 
           // Hide the plot iframe
           const plotIframe = document.getElementById('plot-iframe');
           plotIframe.style.display = 'none';
         } else {
-
           // Display the output
-          const outputElement = document.getElementById('output');
           const dataOutput = JSON.parse(data.output);
-
+          const keyIndicators = JSON.parse(data.key_indicators);
+          
+          // Create a container to hold the key indicators
+          const keyCointainer = document.createElement('div');
           // Create a container to hold the output
           const outputContainer = document.createElement('div');
 
-          // Create a title for the output
+          // Create a title for the key indicators
           const titleElement = document.createElement('h3');
-          titleElement.textContent = 'Output Information';
+          titleElement.textContent = 'Key Indicators';
           titleElement.style.marginBottom = '20px'; // Add extra margin
-          outputContainer.appendChild(titleElement);
+          keyCointainer.appendChild(titleElement);
+
+          // Create a container for the key indicators
+          const keyIndicatorsContainer = document.createElement('div');
+          keyIndicatorsContainer.classList.add('row');
+
+          // Create a table element for the key indicators
+          const tableElement = document.createElement('table');
+          tableElement.classList.add('table');
+
+          // Calculate the number of keys per column
+          const keys = Object.keys(keyIndicators);
+          const keysPerColumn = Math.ceil(keys.length / 3);
+
+          // Create table rows for the key indicators
+          let currentRow;
+
+          for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const value = keyIndicators[key];
+
+            if (i % keysPerColumn === 0) {
+              // Create a new table row
+              currentRow = document.createElement('tr');
+              tableElement.appendChild(currentRow);
+            }
+
+            // Create table cells for key and value
+            const keyCell = document.createElement('td');
+            keyCell.innerHTML = `<strong>${key}:</strong>`;
+
+            const valueCell = document.createElement('td');
+            valueCell.textContent = typeof value === 'number' ? value.toFixed(4) : value;
+
+            // Append key and value cells to the current row
+            currentRow.appendChild(keyCell);
+            currentRow.appendChild(valueCell);
+          }
+
+          // Append the table to the key indicators container
+          keyIndicatorsContainer.appendChild(tableElement);
+
+          // Append the key indicators container to the output container
+          keyCointainer.appendChild(keyIndicatorsContainer);
+
+          // Create a title for the output
+          const titleElement2 = document.createElement('h3');
+          titleElement2.textContent = 'All Statistics';
+          titleElement2.style.marginBottom = '20px'; // Add extra margin
+          outputContainer.appendChild(titleElement2);
 
           // Create a container to hold the columns
           const columnsContainer = document.createElement('div');
           columnsContainer.classList.add('row');
 
-          // Calculate the number of keys per column
-          const keysPerColumn = Math.ceil(Object.keys(dataOutput).length / 3);
+          // Calculate the number of keys per column for the data output
+          const dataKeys = Object.keys(dataOutput);
+          const dataKeysPerColumn = Math.ceil(dataKeys.length / 3);
 
-          // Iterate over the keys and create columns
+          // Iterate over the keys and create columns for the data output
           let currentColumn;
           let count = 0;
-          Object.entries(dataOutput).forEach(([key, value], index) => {
-          if (index % keysPerColumn === 0) {
+
+          for (const key of dataKeys) {
+            const value = dataOutput[key];
+
+            if (count % dataKeysPerColumn === 0) {
               // Create a new column
               currentColumn = document.createElement('div');
               currentColumn.classList.add('col');
               columnsContainer.appendChild(currentColumn);
+            }
+
+            // Create a paragraph element for the key
+            const keyElement = document.createElement('p');
+            keyElement.innerHTML = `<strong>${key}:</strong>`;
+
+            // Create a paragraph element for the value
+            const valueElement = document.createElement('p');
+            valueElement.textContent = typeof value === 'number' ? value.toFixed(4) : value;
+
+            // Append the key and value elements to the current column
+            currentColumn.appendChild(keyElement);
+            currentColumn.appendChild(valueElement);
+
+            count++;
           }
-
-          // Create a paragraph element for the key
-          const keyElement = document.createElement('p');
-          keyElement.innerHTML = `<strong>${key}:</strong>`;
-
-          // Create a paragraph element for the value
-          const valueElement = document.createElement('p');
-          valueElement.textContent = value;
-
-          // Append the key and value elements to the current column
-          currentColumn.appendChild(keyElement);
-          currentColumn.appendChild(valueElement);
-
-          count++;
-          });
 
           // Append the columns to the output container
           outputContainer.appendChild(columnsContainer);
 
+          // Append the key indicators container to the key element
+          keyIndicatorElement.appendChild(keyCointainer);
           // Append the output container to the output element
           outputElement.appendChild(outputContainer);
 
           // Load the plot in the iframe
-          const plotIframe = document.getElementById('plot-iframe');
-          plotIframe.src = `../${data.plot_filename}`;  // Add `../` to the path
+          const plotIframe = document.getElementById('plot-iframe');        
+          plotIframe.src = `../${data.plot_filename}`; // Add `../` to the path
         }
-      })
-      .catch((error) => {
-          // Display error message
-          const errorDiv = document.createElement('div');
-          errorDiv.classList.add('alert', 'alert-danger');
-          errorDiv.textContent = data.error;
-          document.getElementById('output').appendChild(errorDiv);
-      });
+      } catch (error) {
+        // Display error message
+        const errorDiv = document.createElement('div');
+        errorDiv.classList.add('alert', 'alert-danger');
+        errorDiv.textContent = error.message;
+        const keyIndicatorElement = document.getElementById('key_indicators');
+        keyIndicatorElement.appendChild(errorDiv);
+      }
+    };
+
+    fetchData();
+
+    // Function to download iframe content
+    function downloadIframeContent() {
+      const plotIframe = document.getElementById('plot-iframe');
+      const iframeSrc = plotIframe.src;
+
+      // Create a temporary anchor element
+      const downloadLink = document.createElement('a');
+      downloadLink.href = iframeSrc;
+      downloadLink.download = 'plot.html';
+
+      // Simulate a click on the anchor element
+      downloadLink.click();
+    }
+
+    // Function to save the Backtest with a custom name
+    function saveBacktestName() {
+      // Check if the user is logged in
+      {% if session['username'] %}
+        // Get the Backtest Name input value
+        const backtestName = document.getElementById('backtest-name-input').value;
+
+        // Check if the Backtest Name is empty
+        if (backtestName.trim() === '') {
+          alert('Please enter a Backtest Name.');
+          return;
+        }
+
+        // Perform the save operation by sending a request to the backend
+        const data = {
+          backtestName: backtestName,
+          strategyId: '{{ strategy_id }}',
+          backtestID: '{{ backtest_id }}'
+        };
+
+        fetch('/save_backtest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        })
+          .then(response => response.json())
+          .then(result => {
+            if (result.success) {
+              alert('Backtest saved successfully.');
+            } else {
+              alert('Error saving the Backtest.');
+            }
+          })
+          .catch(error => {
+            console.error('Error saving the Backtest:', error);
+            alert('Error saving the Backtest.');
+          });
+      {% else %}
+        // User is not logged in, display an error message
+        alert('You need to be logged in to save the Backtest in your library');
+      {% endif %}
+    }
+
+    // Function to handle downloading all statistics in Excel
+    const downloadExcel = async () => {
+      {% if session['username'] %}
+        try {
+          const response = await fetch(`/download_data?strategy_id=${strategyId}`);
+          const blob = await response.blob();
+
+          // Create a temporary link element
+          const link = document.createElement('a');
+          link.href = window.URL.createObjectURL(blob);
+          link.download = 'all_statistics.xlsx';
+          link.click();
+
+          // Clean up the temporary link
+          window.URL.revokeObjectURL(link.href);
+        } catch (error) {
+          console.error('Error downloading Excel file:', error);
+          // Display error message to the user
+          alert('Error downloading Excel file. Please try again.');
+        }
+      {% else %}
+        // User is not logged in, display an error message
+        alert('You need to be logged in to obtain an excel with the statistics');
+      {% endif %}
+    };
+
+    // Add event listener to the Download All Statistics in Excel button
+    const downloadExcelBtn = document.getElementById('download-excel-btn');
+    downloadExcelBtn.addEventListener('click', downloadExcel);
+    
   </script>
 </body>
 </html>

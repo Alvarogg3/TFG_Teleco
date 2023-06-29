@@ -11,7 +11,9 @@ import pandas as pd
 import requests
 import json
 import bcrypt
-import io
+import pickle
+from io import BytesIO
+import xlsxwriter
 
 # Backtesting
 from backtesting import Backtest, Strategy
@@ -21,6 +23,8 @@ import pkgutil
 import inspect
 from importlib import import_module
 
+## CONSTANTS
+KEY_INDICATORS = ["Return (Ann.) [%]", "Exposure Time [%]", "Volatility (Ann.) [%]", "Return [%]", "Sharpe Ratio", "Buy & Hold Return [%]"]
 
 ## ALPHAVANTAGE API KEYS
 # Load the keys from the json file
@@ -64,6 +68,10 @@ strategies_collection = db['default_strategies']
 db = client['user_database']
 users_collection = db['users']
 
+# Access the collection for the backtests
+db = client['backtests_db']
+bt_collection = db['backtests']
+
 ## FLASK APP
 app = Flask(__name__)
 
@@ -101,11 +109,11 @@ def display_results():
   ticker = request.args.get('ticker')
   frequency = request.args.get('frequency')
   commission = request.args.get("commission")
-  print(strategy_id)
+  backtest_id = request.args.get('backtestId')
   # Pass the parameters to the strategy_results.html template
   return render_template('strategy_results.html', 
                          strategy_id=strategy_id, start_date=start_date, end_date=end_date, 
-                         ticker=ticker, frequency=frequency, commission=commission)
+                         ticker=ticker, frequency=frequency, commission=commission, backtest_id=backtest_id)
 
 # Protected Route - Backend
 @app.route('/backtests')
@@ -172,14 +180,6 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
-# Protected Route
-@app.route('/protected')
-def protected():
-    if 'username' in session:
-        username = session['username']
-        return f'Welcome, {username}!'
-    return redirect(url_for('login'))
-
 ## GENERAL METHODS
 @app.route('/search_ticker')
 def search_ticker():
@@ -219,6 +219,36 @@ def get_strategies():
 
     return jsonify(list(strategies))
 
+@app.route('/get_backtests')
+def get_backtests():
+    if 'username' in session:
+        username = session['username']
+        backtests = bt_collection.find({'username': username}, {'_id': 0, 'bt_object': 0})  # Exclude the _id and bt_object fields from the result
+        return jsonify(list(backtests))
+    else:
+        return jsonify({'error': 'You need to be logged in to access your backtests.'}), 401
+    
+@app.route('/delete_non_permanent_backtests', methods=['POST'])
+def delete_non_permanent_backtests():
+    if 'username' in session:
+        username = session['username']
+        result = bt_collection.delete_many({'username': username, 'permanent': {'$ne': True}})
+        return jsonify({'deleted_count': result.deleted_count})
+    else:
+        return jsonify({'error': 'User not logged in'})
+    
+@app.route('/delete_backtest/<backtest_id>', methods=['DELETE'])
+def delete_backtest(backtest_id):
+    if 'username' in session:
+        username = session['username']
+        result = bt_collection.delete_one({'username': username, 'name': backtest_id})
+        if result.deleted_count == 1:
+            return jsonify({'message': 'Backtest deleted successfully.'}), 200
+        else:
+            return jsonify({'error': 'Backtest not found.'}), 404
+    else:
+        return jsonify({'error': 'You need to be logged in to delete a backtest.'}), 401
+
 # Download the strategy code to practice
 @app.route('/download_strategy/<string:strategyFilename>')
 def download_strategy(strategyFilename):
@@ -245,20 +275,49 @@ def execute_strategy():
     ticker = request.args.get('ticker')
     frequency = int(request.args.get('frequency'))
     commission = float(request.args.get("commission"))
+    backtestId = request.args.get("backtestId")
 
     # Get the strategy class based on the strategy ID
     selected_strategy_class = strategy_classes.get(strategy_id)
     if strategy_class is None:
         return jsonify({'error': f"Invalid strategy ID: {strategy_id}"}), 404
 
-    # Get stock data for the ticker from MongoDB
-    stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
+    if backtestId == "":
+        # Get stock data for the ticker from MongoDB
+        stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
 
-    # Resample to correct freuency
-    data =  stock_data.iloc[::frequency]
+        # Resample to correct freuency
+        data =  stock_data.iloc[::frequency]
 
-    # Execute the strategy with the stock data
-    bt = Backtest(data, selected_strategy_class, cash=10000, commission=commission, exclusive_orders=True)
+        # Execute the strategy with the stock data
+        bt = Backtest(data, selected_strategy_class, cash=10000, commission=commission, exclusive_orders=True)
+
+        # Save the bt object in the MongoDB collection if the user is authenticated
+        if 'username' in session:
+            username = session['username']
+            bt_pickled = pickle.dumps(bt)
+            name = f"{username}_{strategy_id}"
+            bt_document = {
+                'username': username,
+                'name': name,
+                'strategy_id': strategy_id,
+                'start_date': start_date,
+                'end_date': end_date,
+                'ticker': ticker,
+                'frequency': frequency,
+                'commission': commission,
+                'bt_object': bt_pickled,
+                'permanent': False
+            }
+            bt_collection.update_one(
+                {'username': username, 'name': name},
+                {'$set': bt_document},
+                upsert=True
+            )
+    else:
+        # Get the backtest object from MongoDB
+        backtest = bt_collection.find_one({'username': session['username'], 'name': backtestId})
+        bt = pickle.loads(backtest['bt_object'])
 
     try:
         result = bt.run()
@@ -267,58 +326,71 @@ def execute_strategy():
             plot_filename = f"static/html_outputs/{selected_strategy_class.__name__}.html"
             bt.plot(filename=plot_filename, open_browser=False)
             # Pass the plot filename and strategy results
-            return jsonify({'output': json.dumps(result[:-3].to_dict(), indent=4, default=str), 'plot_filename': plot_filename}) 
+            return jsonify({'output': json.dumps(result[:-3].to_dict(), default=str),
+                            'key_indicators': json.dumps(result[KEY_INDICATORS].to_dict(), default=str), 
+                             'plot_filename': plot_filename}) 
         else: 
             return jsonify({'error': 'There are not enough trades for this strategy.'}), 404
     except Exception as e:
         # Return an error message
         return jsonify({'error': 'Error executing strategy.'}), 404
     
-@app.route('/html_outputs/<path:filename>')
-def serve_output(filename):
-    root_dir = os.path.dirname(os.getcwd())
-    return send_from_directory(os.path.join(root_dir, 'static', 'html_outputs'), filename)
+# Save Backtest
+@app.route('/save_backtest', methods=['POST'])
+def save_backtest():
+    # Check if the user is authenticated
+    if 'username' not in session:
+        return jsonify({'error': 'You need to be logged in to save the Backtest.'}), 401
 
-@app.route('/download_data')
-def download_data():
-    strategy_id = request.args.get('strategy_id')
-    data_type = request.args.get('data_type')
+    # Get the input parameters from the request
+    data = request.get_json()
+    backtest_name = data.get('backtestName')
+    strategy_id = data.get('strategyId')
+    old_backtest_name = data.get('backtestID')
 
-    if data_type == 'output':
-        # Process output data
-        output = request.args.get('output')
+    print(old_backtest_name)
 
-        # Generate Excel file
-        filename = f"output_{strategy_id}.xlsx"
-        output_data = {'output': output}  # Replace with the actual output data
-        df_output = pd.DataFrame(output_data)
-        df_output.to_excel(filename, index=False)
+    # Generate the new Backtest name
+    username = session['username']
+    if old_backtest_name == "":
+        old_backtest_name = f"{username}_{strategy_id}"
 
-    elif data_type == 'equity_curve':
-        # Process equity curve data
-        equity_curve = request.args.get('equity_curve')
+    # Perform the update operation in MongoDB
+    result = bt_collection.update_one(
+        {'name': old_backtest_name},
+        {'$set': {'name': backtest_name, 'permanent': True}}
+    )
 
-        # Generate Excel file
-        filename = f"equity_curve_{strategy_id}.xlsx"
-        equity_curve_data = {'equity_curve': equity_curve}  # Replace with the actual equity curve data
-        df_equity_curve = pd.DataFrame(equity_curve_data)
-        df_equity_curve.to_excel(filename, index=False)
-
-    elif data_type == 'trades':
-        # Process trades data
-        trades = request.args.get('trades')
-
-        # Generate Excel file
-        filename = f"trades_{strategy_id}.xlsx"
-        trades_data = {'trades': trades}  # Replace with the actual trades data
-        df_trades = pd.DataFrame(trades_data)
-        df_trades.to_excel(filename, index=False)
-
+    if result.modified_count > 0:
+        # Redirect to the display_results route with the updated backtest_id parameter
+        return redirect(url_for('display_results', backtestId=backtest_name))
     else:
-        return jsonify({'error': f"Invalid data type: {data_type}"})
+        return jsonify({'error': 'Failed to update the Backtest name.'}), 500
+    
+# Route to download all statistics in Excel
+@app.route('/download_data', methods=['GET'])
+def download_data():
+    if 'username' in session:
+        username = session['username']
+        strategy_id = request.args.get('strategy_id')
+        backtest_name = f"{username}_{strategy_id}"
 
-    # Send the file for download
-    return send_file(filename, as_attachment=True)
+        # Fetch the bt object from MongoDB
+        bt_document = bt_collection.find_one({'name': backtest_name})
+        if bt_document:
+            bt_pickled = bt_document['bt_object']
+            bt = pickle.loads(bt_pickled)
+
+            # Run the bt object to obtain the output
+            result = bt.run()
+
+            # Create an ExcelWriter object
+            with pd.ExcelWriter('statistics.xlsx', engine='xlsxwriter') as excel_writer:
+                # Write the DataFrame to the Excel file
+                result[:-2].to_excel(excel_writer, sheet_name='Statistics')
+            # Send the Excel file as a response
+            return send_file('statistics.xlsx', as_attachment=True)
+    return jsonify({'error': 'Unauthorized.'}), 401
     
 ## FUNCTIONS
 # Calculate the adjustment factor and create adjusted DataFrame

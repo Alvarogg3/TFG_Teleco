@@ -3,26 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trader Companion</title>
+  <title>Trader Companion - Backtests</title>
   <!-- Include Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-  <style>
-    .main-content {
-      margin-top: 80px;
-    }
-    .main-content p {
-      margin-bottom: 20px;
-    }
-    .main-content .btn-block {
-      margin-top: 30px;
-    }
-  </style>
 </head>
 <body>
   <!-- Header -->
   <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <a class="navbar-brand" href="#">Trader Companion</a>
+      <a class="navbar-brand" href="/">Trader Companion</a>
       <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -49,22 +38,11 @@
   </header>
 
   <!-- Main Content -->
-  <main class="container main-content">
-    <h1 class="mt-4">Welcome to Trader Companion!</h1>
-    <div class="row mt-5">
-      <div class="col-md-12">
-        <p class="lead">Trader Companion is a <strong>powerful</strong> tool designed to assist traders in making <strong>informed decisions</strong> and maximizing their <strong>trading strategies</strong>.</p>
-        <p class="lead">With Trader Companion, you can explore a wide range of <strong>predefined strategies</strong>, analyze market trends, and select the most suitable stocks to execute your trading plan.</p>
-        <p class="lead">Start by checking out the <strong>available strategies</strong> below and choose the one that aligns with your trading goals. Then, select the stocks to apply the strategy and take your trading to the <strong>next level</strong>. Trader Companion also allows you to <strong>optimize</strong> the strategies to further enhance your trading performance.</p>
-      </div>
-    </div>
-    <div class="row mt-5">
-      <div class="col-md-6">
-        <a href="/check_strategies" class="btn btn-primary btn-lg btn-block">Learn and Test Common Strategies</a>
-      </div>
-      <div class="col-md-6">
-        <a href="/select_stocks/0" class="btn btn-secondary btn-lg btn-block" id="test-strategy-btn">Upload your Own Strategy</a>
-      </div>
+  <main class="container">
+    <h1 class="mt-4">Your Backtests</h1>
+
+    <div class="row mt-5" id="backtests-container">
+      <!-- Backtests will be dynamically added here -->
     </div>
   </main>
 
@@ -79,6 +57,79 @@
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-  <!-- <script src="{{ url_for('static', filename='main.js') }}"></script> -->
+  <script>
+    // Function to delete non-permanent backtests
+    async function deleteNonPermanentBacktests() {
+      try {
+        const response = await fetch('/delete_non_permanent_backtests', {
+          method: 'POST',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`Deleted ${data.deleted_count} non-permanent backtests`);
+        } else {
+          console.error('Error deleting non-permanent backtests:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error deleting non-permanent backtests:', error);
+      }
+    }
+
+    // Function to fetch and display backtests
+    async function fetchBacktests() {
+      try {
+        const response = await fetch('/get_backtests'); // Replace with your API endpoint to fetch backtests
+        const backtests = await response.json();
+
+        const backtestsContainer = document.getElementById('backtests-container');
+
+        backtests.forEach(backtest => {
+          const backtestCard = `
+            <div class="col-md-4 mb-4">
+              <div class="card">
+                <img class="card-img-top" src="../static/images/backtests.jpg" alt="Backtest Image">
+                <div class="card-body">
+                  <h5 class="card-title">${backtest.name}</h5>
+                  <p class="card-text">Strategy: ${backtest.strategy_id}</p>
+                  <p class="card-text">Ticker: ${backtest.ticker}</p>
+                  <p class="card-text">Start Date: ${backtest.start_date}</p>
+                  <p class="card-text">End Date: ${backtest.end_date}</p>
+                  <a href="/display_results?strategyId=${backtest.strategy_id}&startDate=${backtest.start_date}&endDate=${backtest.end_date}&ticker=${backtest.ticker}&frequency=${backtest.frequency}&commission=${backtest.commission}&backtestId=${backtest.name}" class="btn btn-primary">View Details</a>
+                  <button onclick="deleteBacktest('${backtest.name}')" class="btn btn-danger">Delete</button>
+                </div>
+              </div>
+            </div>
+          `;
+
+          backtestsContainer.innerHTML += backtestCard;
+        });
+      } catch (error) {
+        console.error('Error fetching backtests:', error);
+      }
+    }
+
+    // Function to delete a backtest
+    async function deleteBacktest(backtestId) {
+      try {
+        const response = await fetch(`/delete_backtest/${backtestId}`, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          // Reload the page to update the backtests list
+          window.location.reload();
+        } else {
+          console.error('Error deleting backtest:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error deleting backtest:', error);
+      }
+    }
+
+    // Call the function to first delete and then fetch and display backtests
+    deleteNonPermanentBacktests();
+    fetchBacktests();
+  </script>
 </body>
 </html>
