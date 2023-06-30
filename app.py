@@ -14,6 +14,7 @@ import bcrypt
 import pickle
 from io import BytesIO
 import xlsxwriter
+import re
 
 # Backtesting
 from backtesting import Backtest, Strategy
@@ -256,7 +257,6 @@ def download_strategy(strategyFilename):
 
     # Assuming the strategy modules are stored in the `strategy_modules` directory
     strategy_file_path = f'modules/{strategyFilename}'
-    print(strategy_file_path)
 
     try:
         # Send the strategy module file as a download
@@ -314,13 +314,21 @@ def execute_strategy():
                 {'$set': bt_document},
                 upsert=True
             )
+            backtest = {'a':0}
     else:
         # Get the backtest object from MongoDB
         backtest = bt_collection.find_one({'username': session['username'], 'name': backtestId})
         bt = pickle.loads(backtest['bt_object'])
 
     try:
-        result = bt.run()
+        # Check if the 'opt_values' field exists in the backtest document
+        if 'opt_values' in backtest:
+            opt_values = backtest['opt_values']
+            result = bt.optimize(**opt_values, maximize='Equity Final [$]')
+            # Use optimized values for further processing
+        else:
+            result = bt.run()
+        # Check if there are trades
         if result["# Trades"] > 1:
             # Generate the plot and save it as HTML
             plot_filename = f"static/html_outputs/{selected_strategy_class.__name__}.html"
@@ -393,6 +401,96 @@ def download_data():
             # Send the Excel file as a response
             return send_file('statistics.xlsx', as_attachment=True)
     return jsonify({'error': 'Unauthorized.'}), 401
+
+@app.route('/get_optim_parameters', methods=['GET'])
+def get_parameter_descriptions():
+    strategy_id = request.args.get('strategyId')
+    username = session.get('username')
+
+    parameter_descriptions = {}
+    
+    # Fetch the document from MongoDB based on the strategy_id and username
+    document = strategies_collection.find_one({'strategy_id': strategy_id, 'users': {'$in': [username, 'all']}})
+    
+    if document:
+        # Extract the parameters dictionary from the document
+        parameters = document.get('parameters', {})
+        
+        # Loop through the parameters and descriptions
+        for parameter, description in parameters.items():
+            value = description.get('value')
+            param_description = description.get('description')
+            
+            # Create the parameter description dictionary
+            parameter_description = {
+                'value': value,
+                'description': param_description
+            }
+            
+            # Add the parameter description to the result dictionary
+            parameter_descriptions[parameter] = parameter_description
+
+    return jsonify(parameter_descriptions)
+
+# Optimize a trading strategy
+@app.route('/optimize_strategy', methods=['POST'])
+def optimize_strategy():
+    try:
+        # Get the strategy parameters from the request body
+        strategy_params = request.json['formData']
+
+        # Set up the optimization ranges for each parameter
+        param_ranges = {}
+        for param, value in strategy_params.items():
+            min_value = int(value['min'])
+            max_value = int(value['max']) + 1
+            step_value = int(value['step'])
+            param_ranges[param] = range(min_value, max_value + 1, step_value)
+
+        # Get the backtest object from MongoDB
+        backtest_id = request.json['backtestId']
+        strategy_id = request.json['strategyId']
+        # Check if the strategy is not saved
+        if backtest_id == "":
+            backtest_id = f"{session['username']}_{strategy_id}"
+        backtest = bt_collection.find_one({'username': session['username'], 'name': backtest_id})
+        if backtest is None:
+            return jsonify({'error': 'Backtest not found.'}), 404
+
+        bt = pickle.loads(backtest['bt_object'])
+
+        # Optimize the backtest using the parameter ranges
+        res = bt.optimize(**param_ranges, maximize='Equity Final [$]')
+        opt_values = get_opt_values(str(res._strategy))
+
+        # Create the optimized backtest document
+        optimized_backtest = {
+            'username': backtest['username'],
+            'name': backtest_id + "_opt",
+            'strategy_id': backtest['strategy_id'],
+            'start_date': backtest['start_date'],
+            'end_date': backtest['end_date'],
+            'ticker': backtest['ticker'],
+            'frequency': backtest['frequency'],
+            'commission': backtest['commission'],
+            'bt_object': backtest['bt_object'],
+            'opt_values': opt_values,
+            'permanent': False
+        }
+
+        # Update the backtest object in MongoDB with upsert=True
+        bt_collection.update_one(
+            {'username': backtest['username'], 'name': optimized_backtest['name']},
+            {'$set': optimized_backtest},
+            upsert=True
+        )
+
+        # Return the name of the optimized backtest object as JSON
+        return jsonify({'backtestId': optimized_backtest['name'], "opt_values": opt_values})
+
+    except Exception as e:
+        # Return an error message
+        return jsonify({'error': 'Error optimizing strategy.'}), 500
     
 ## FUNCTIONS
 # Calculate the adjustment factor and create adjusted DataFrame
@@ -468,6 +566,14 @@ def get_stock_data_from_mongodb(ticker, start_date, end_date):
     data = data.sort_index(ascending=True)
 
     return data
+
+def get_opt_values(string):
+    parameters_str = re.search(r'\((.*?)\)', string).group(1)
+    parameters = {}
+    for param in parameters_str.split(','):
+        name, value = param.split('=')
+        parameters[name.strip()] = int(value.strip())
+    return parameters
 
 if __name__ == '__main__':
     app.run(debug=True)

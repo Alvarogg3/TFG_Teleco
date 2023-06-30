@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +15,7 @@
       align-items: center;
       height: 100vh;
     }
+
     /* Adjust the iframe size */
     #plot-iframe {
       width: 100%;
@@ -22,30 +24,32 @@
     }
   </style>
 </head>
+
 <body>
   <!-- Header -->
   <header>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <a class="navbar-brand" href="/">Trader Companion</a>
-      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
         <ul class="navbar-nav">
           {% if session['username'] %}
-            <li class="nav-item mr-5">
-              <a class="nav-link font-weight-bold" href="/backtests">{{ session['username']|capitalize }}'s Backtests</a>
-            </li>
-            <li class="nav-item mr-5">
-              <a class="nav-link" href="/logout">Logout</a>
-            </li>
+          <li class="nav-item mr-5">
+            <a class="nav-link font-weight-bold" href="/backtests">{{ session['username']|capitalize }}'s Backtests</a>
+          </li>
+          <li class="nav-item mr-5">
+            <a class="nav-link" href="/logout">Logout</a>
+          </li>
           {% else %}
-            <li class="nav-item mr-5">
-              <a class="nav-link font-weight-bold" href="/login">Login</a>
-            </li>
-            <li class="nav-item mr-5">
-              <a class="nav-link" href="/signup">Signup</a>
-            </li>
+          <li class="nav-item mr-5">
+            <a class="nav-link font-weight-bold" href="/login">Login</a>
+          </li>
+          <li class="nav-item mr-5">
+            <a class="nav-link" href="/signup">Signup</a>
+          </li>
           {% endif %}
         </ul>
       </div>
@@ -77,7 +81,6 @@
       <div class="mt-5">
         <div class="d-flex align-items-center">
           <button onclick="downloadIframeContent()" class="btn btn-secondary mr-4">Download Graph in HTML</button>
-          <a href="{{ url_for('download_data', strategy_id=strategy_id, data_type='trades') }}" class="btn btn-primary mx-4">Optimize Strategy</a>
           <div class="ml-4">
             <button class="btn btn-success " onclick="saveBacktestName()">Save Backtest</button>
           </div>
@@ -85,31 +88,40 @@
             <input type="text" id="backtest-name-input" class="form-control" placeholder="Backtest Name">
           </div>
         </div>
+        <!-- Optimized Parameters Form -->
+        <div class="mt-5">
+          <h3>Parameters to Optimize</h3>
+          <form id="parameters-form">
+            <!-- Parameters will be dynamically added here -->
+          </form>
+          <button id="optimize-button" class="btn btn-primary">Optimize Strategy</button>
+          <div id="loading-spinner" class="spinner-border text-primary ml-4" role="status" style="display: none;"></div>
+        </div>
       </div>
 
-    <div class="mt-5">
-        <!-- Output data here --> 
+      <div class="mt-5">
+        <!-- Output data here -->
         <p id="output"></p>
         <!-- Download buttons here -->
         <button id="download-excel-btn" class="btn btn-secondary">Download All Statistics in Excel</button>
 
-   </div>
+      </div>
   </main>
 
-   <!-- Footer -->
-   <footer class="footer bg-dark text-white text-center py-3 mt-5">
+  <!-- Footer -->
+  <footer class="footer bg-dark text-white text-center py-3 mt-5">
     <div class="container">
       <span>&copy; 2023 Trader Companion. All rights reserved.</span>
     </div>
   </footer>
-  
+
   <!-- Include Bootstrap JS -->
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
   <script>
     // Display the loading screen
     document.querySelector('.loading-screen').style.display = 'flex';
-  
+
     // Get the parameters from the URL
     const urlParams = new URLSearchParams(window.location.search);
     const strategyId = urlParams.get('strategyId');
@@ -119,7 +131,7 @@
     const frequency = urlParams.get('frequency');
     const commission = urlParams.get('commission');
     const backtestId = urlParams.get('backtestId');
-  
+
     // Fetch the strategy results
     const fetchData = async () => {
       try {
@@ -152,7 +164,7 @@
           // Display the output
           const dataOutput = JSON.parse(data.output);
           const keyIndicators = JSON.parse(data.key_indicators);
-          
+
           // Create a container to hold the key indicators
           const keyCointainer = document.createElement('div');
           // Create a container to hold the output
@@ -259,7 +271,7 @@
           outputElement.appendChild(outputContainer);
 
           // Load the plot in the iframe
-          const plotIframe = document.getElementById('plot-iframe');        
+          const plotIframe = document.getElementById('plot-iframe');
           plotIframe.src = `../${data.plot_filename}`; // Add `../` to the path
         }
       } catch (error) {
@@ -292,83 +304,268 @@
     function saveBacktestName() {
       // Check if the user is logged in
       {% if session['username'] %}
-        // Get the Backtest Name input value
-        const backtestName = document.getElementById('backtest-name-input').value;
+      // Get the Backtest Name input value
+      const backtestName = document.getElementById('backtest-name-input').value;
 
-        // Check if the Backtest Name is empty
-        if (backtestName.trim() === '') {
-          alert('Please enter a Backtest Name.');
-          return;
-        }
+      // Check if the Backtest Name is empty
+      if (backtestName.trim() === '') {
+        alert('Please enter a Backtest Name.');
+        return;
+      }
 
-        // Perform the save operation by sending a request to the backend
-        const data = {
-          backtestName: backtestName,
-          strategyId: '{{ strategy_id }}',
-          backtestID: '{{ backtest_id }}'
-        };
+      // Perform the save operation by sending a request to the backend
+      const data = {
+        backtestName: backtestName,
+        strategyId: '{{ strategy_id }}',
+        backtestID: '{{ backtest_id }}'
+      };
 
-        fetch('/save_backtest', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        })
-          .then(response => response.json())
-          .then(result => {
-            if (result.backtestId) {
-              alert('Backtest saved successfully.');
-              // Get the current URL
-              const url = new URL(window.location.href);
-              // Set the backtestId parameter to the new value
-              url.searchParams.set('backtestId', result.backtestId);
-              // Redirect to the updated URL
-              window.location.href = url.href;
-            } else {
-              alert('Error saving the Backtest.');
-            }
-          })
-          .catch(error => {
-            console.error('Error saving the Backtest:', error);
+      fetch('/save_backtest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      })
+        .then(response => response.json())
+        .then(result => {
+          if (result.backtestId) {
+            alert('Backtest saved successfully.');
+            // Get the current URL
+            const url = new URL(window.location.href);
+            // Set the backtestId parameter to the new value
+            url.searchParams.set('backtestId', result.backtestId);
+            // Redirect to the updated URL
+            window.location.href = url.href;
+          } else {
             alert('Error saving the Backtest.');
-          });
+          }
+        })
+        .catch(error => {
+          console.error('Error saving the Backtest:', error);
+          alert('Error saving the Backtest.');
+        });
       {% else %}
-        // User is not logged in, display an error message
-        alert('You need to be logged in to save the Backtest in your library');
+      // User is not logged in, display an error message
+      alert('You need to be logged in to save the Backtest in your library');
       {% endif %}
     }
 
     // Function to handle downloading all statistics in Excel
     const downloadExcel = async () => {
       {% if session['username'] %}
-        try {
-          const response = await fetch(`/download_data?strategy_id=${strategyId}&backtestId=${backtestId}`);
-          const blob = await response.blob();
+      try {
+        const response = await fetch(`/download_data?strategy_id=${strategyId}&backtestId=${backtestId}`);
+        const blob = await response.blob();
 
-          // Create a temporary link element
-          const link = document.createElement('a');
-          link.href = window.URL.createObjectURL(blob);
-          link.download = 'all_statistics.xlsx';
-          link.click();
+        // Create a temporary link element
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = 'all_statistics.xlsx';
+        link.click();
 
-          // Clean up the temporary link
-          window.URL.revokeObjectURL(link.href);
-        } catch (error) {
-          console.error('Error downloading Excel file:', error);
-          // Display error message to the user
-          alert('Error downloading Excel file. Please try again.');
-        }
+        // Clean up the temporary link
+        window.URL.revokeObjectURL(link.href);
+      } catch (error) {
+        console.error('Error downloading Excel file:', error);
+        // Display error message to the user
+        alert('Error downloading Excel file. Please try again.');
+      }
       {% else %}
-        // User is not logged in, display an error message
-        alert('You need to be logged in to obtain an excel with the statistics');
+      // User is not logged in, display an error message
+      alert('You need to be logged in to obtain an excel with the statistics');
       {% endif %}
     };
 
     // Add event listener to the Download All Statistics in Excel button
     const downloadExcelBtn = document.getElementById('download-excel-btn');
     downloadExcelBtn.addEventListener('click', downloadExcel);
-    
+
+    // Fetch parameter descriptions from the server
+    const fetchParameterDescriptions = async (strategyId) => {
+      try {
+        const response = await fetch(`/get_optim_parameters?strategyId=${strategyId}`);
+        const parameterDescriptions = await response.json();
+        return parameterDescriptions;
+      } catch (error) {
+        console.error('Error fetching parameter descriptions:', error);
+        return {};
+      }
+    };
+
+    // Function to create form elements for parameter descriptions
+    const createFormElements = (parameterDescriptions) => {
+      const form = document.getElementById('parameters-form');
+
+      // Loop through the parameter descriptions and create form elements
+      for (const parameter in parameterDescriptions) {
+        const parameterDescription = parameterDescriptions[parameter];
+
+        // Create the form group div
+        const formGroupDiv = document.createElement('div');
+        formGroupDiv.classList.add('form-group');
+
+        // Create the label element
+        const label = document.createElement('label');
+        label.innerHTML = `<strong>${parameter}</strong>  --   default value: ${parameterDescription.value}`;
+        formGroupDiv.appendChild(label);
+
+        // Create a row to hold the inputs
+        const rowDiv = document.createElement('div');
+        rowDiv.classList.add('row');
+
+        // Create the min input column
+        const minColumnDiv = document.createElement('div');
+        minColumnDiv.classList.add('col');
+        const minLabel = document.createElement('label');
+        minLabel.textContent = 'Min';
+        const minInput = document.createElement('input');
+        minInput.type = 'number';
+        minInput.id = parameter + '_min';
+        minInput.classList.add('form-control');
+        minColumnDiv.appendChild(minLabel);
+        minColumnDiv.appendChild(minInput);
+        rowDiv.appendChild(minColumnDiv);
+
+        // Create the max input column
+        const maxColumnDiv = document.createElement('div');
+        maxColumnDiv.classList.add('col');
+        const maxLabel = document.createElement('label');
+        maxLabel.textContent = 'Max';
+        const maxInput = document.createElement('input');
+        maxInput.type = 'number';
+        maxInput.id = parameter + '_max';
+        maxInput.classList.add('form-control');
+        maxColumnDiv.appendChild(maxLabel);
+        maxColumnDiv.appendChild(maxInput);
+        rowDiv.appendChild(maxColumnDiv);
+
+        // Create the step input column
+        const stepColumnDiv = document.createElement('div');
+        stepColumnDiv.classList.add('col');
+        const stepLabel = document.createElement('label');
+        stepLabel.textContent = 'Step';
+        const stepInput = document.createElement('input');
+        stepInput.type = 'number';
+        stepInput.id = parameter + '_step';
+        stepInput.classList.add('form-control');
+        stepColumnDiv.appendChild(stepLabel);
+        stepColumnDiv.appendChild(stepInput);
+        rowDiv.appendChild(stepColumnDiv);
+
+        // Append the row to the form group div
+        formGroupDiv.appendChild(rowDiv);
+
+        // Create the small element for the description
+        const small = document.createElement('small');
+        small.classList.add('form-text', 'text-muted');
+        small.textContent = parameterDescription.description;
+        formGroupDiv.appendChild(small);
+
+        // Append the form group div to the form
+        form.appendChild(formGroupDiv);
+      }
+    };
+
+    // Function to handle the optimization process
+    const optimize = () => {
+      {% if session['username'] %}
+      // Display the loading spinner
+      const loadingSpinner = document.getElementById('loading-spinner');
+      loadingSpinner.style.display = 'inline-block';
+
+      // Get the form inputs
+      const form = document.getElementById('parameters-form');
+      const inputElements = form.getElementsByTagName('input');
+
+      // Create an object to hold the serialized form data
+      const serializedData = {};
+
+      // Loop through the input elements and extract the values
+      for (let i = 0; i < inputElements.length; i += 3) {
+        const parameter = inputElements[i].id.replace('_min', '');
+        const min = inputElements[i].value.trim();
+        const max = inputElements[i + 1].value.trim();
+        const step = inputElements[i + 2].value.trim();
+
+        // Check if any of the input values are empty
+        if (min === '' || max === '' || step === '') {
+          alert('Please fill in all the input fields.');
+          return;
+        }
+
+        // Create an object with min, max, and step values
+        serializedData[parameter] = {
+          min: parseFloat(min),
+          max: parseFloat(max),
+          step: parseFloat(step)
+        };
+      }
+
+      // Check if there are any parameters to optimize
+      if (Object.keys(serializedData).length === 0) {
+        alert('No parameters to optimize.');
+        return;
+      }
+
+      console.log('Optimization param:', serializedData);
+
+      // Create the payload for the optimization request
+      const payload = {
+        strategyId: '{{ strategy_id }}',
+        backtestId: '{{ backtest_id }}',
+        formData: serializedData
+      };
+
+      // Send the payload to the backend for optimization
+      fetch('/optimize_strategy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+        .then((response) => response.json())
+        .then((result) => {
+          // Handle the result from the backend
+          console.log('Optimization Result:', result);
+          if (result.backtestId) {
+            alert('Optimization completed successfully. These are the optimal values: <br>' + JSON.stringify(result.opt_values));
+            // Get the current URL
+            const url = new URL(window.location.href);
+            // Set the backtestId parameter to the new value
+            url.searchParams.set('backtestId', result.backtestId);
+            // Redirect to the updated URL
+            window.location.href = url.href;
+          } else {
+            alert('Error optimizing strategy. Some of the parameters combinations might result in no trades.');
+          }
+        })
+        .catch((error) => {
+          console.error('Error optimizing strategy:', error);
+          // Handle the error
+          // ...
+        });
+      {% else %}
+      // User is not logged in, display an error message
+      alert('You need to be logged in to be able to optimize strategies');
+      {% endif %}
+    };
+
+    // Fetch the parameter descriptions and create the form elements
+    fetchParameterDescriptions(strategyId)
+      .then((parameterDescriptions) => {
+        createFormElements(parameterDescriptions);
+      })
+      .catch((error) => {
+        console.error('Error fetching parameter descriptions:', error);
+      });
+
+    // Add event listener to the optimize button
+    const optimizeButton = document.getElementById('optimize-button');
+    optimizeButton.addEventListener('click', optimize);
+
   </script>
 </body>
+
 </html>
