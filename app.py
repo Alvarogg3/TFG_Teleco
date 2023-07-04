@@ -495,6 +495,7 @@ def optimize_strategy():
     try:
         # Get the strategy parameters from the request body
         strategy_params = request.json['formData']
+        print(strategy_params)
 
         # Set up the optimization ranges for each parameter
         param_ranges = {}

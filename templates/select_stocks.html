@@ -42,18 +42,18 @@
 
   <!-- Main Content -->
   <main class="container">
-    <h1 class="mt-4">Select Stocks</h1>
+    <h1 class="mt-4">Select a Stock to Trade</h1>
     <form id="main-form">
 
       <!-- Date Period Selector -->
       <div class="form-group">
         <div class="row">
           <div class="col">
-            <label for="start-date">Select Start Date:</label>
+            <label for="start-date">Trading Period Start Date:</label>
             <input type="date" class="form-control" id="start-date" name="start-date" min="1999-11-01" max="2030-12-31" required>
           </div>
           <div class="col">
-            <label for="end-date">Select End Date:</label>
+            <label for="end-date">Trading Period End Date:</label>
             <input type="date" class="form-control" id="end-date" name="end-date" min="1999-11-01" max="2030-12-31" required>
           </div>
         </div>
@@ -75,22 +75,22 @@
 
       <!-- Ticker Box -->
       <div class="form-group">
-        <label for="ticker-input">Search Ticker:</label>
+        <label for="ticker-input">Selected Stock:</label>
         <div class="input-group">
-          <input type="text" class="form-control ticker-input" placeholder="Enter ticker" required>
+          <input type="text" class="form-control ticker-input" placeholder="Search ticker" required>
           <div class="input-group-append">
             <button type="button" class="btn btn-primary info-btn">+info</button>
           </div>
         </div>
       </div>
 
-      <!-- Stock Info -->
-      <div id="stock-info"></div>
-
       <!-- Submit Button -->
       <div class="form-group">
         <button type="submit" class="btn btn-success" id="submit-btn">Submit</button>
       </div>
+
+      <!-- Stock Info -->
+      <div id="stock-info"></div>
     </form>
 
      <!-- Loading Animation -->
@@ -264,7 +264,38 @@
           <p><strong>Market Capitalization:</strong> ${data.MarketCapitalization}</p>
           <p><strong>EPS:</strong> ${data.EPS}</p>
           <p><strong>Revenue TTM:</strong> ${data.RevenueTTM}</p>
-          <!-- Add more information here -->
+          <p><strong>Fiscal Year End:</strong> ${data.FiscalYearEnd}</p>
+          <p><strong>Latest Quarter:</strong> ${data.LatestQuarter}</p>
+          <p><strong>EBITDA:</strong> ${data.EBITDA}</p>
+          <p><strong>P/E Ratio:</strong> ${data.PERatio}</p>
+          <p><strong>P/E Growth Ratio:</strong> ${data.PEGRatio}</p>
+          <p><strong>Book Value:</strong> ${data.BookValue}</p>
+          <p><strong>Dividend Per Share:</strong> ${data.DividendPerShare}</p>
+          <p><strong>Dividend Yield:</strong> ${data.DividendYield}</p>
+          <p><strong>Revenue per Share TTM:</strong> ${data.RevenuePerShareTTM}</p>
+          <p><strong>Profit Margin:</strong> ${data.ProfitMargin}</p>
+          <p><strong>Operating Margin TTM:</strong> ${data.OperatingMarginTTM}</p>
+          <p><strong>Return on Assets TTM:</strong> ${data.ReturnOnAssetsTTM}</p>
+          <p><strong>Return on Equity TTM:</strong> ${data.ReturnOnEquityTTM}</p>
+          <p><strong>Gross Profit TTM:</strong> ${data.GrossProfitTTM}</p>
+          <p><strong>Diluted EPS TTM:</strong> ${data.DilutedEPSTTM}</p>
+          <p><strong>Quarterly Earnings Growth (YoY):</strong> ${data.QuarterlyEarningsGrowthYOY}</p>
+          <p><strong>Quarterly Revenue Growth (YoY):</strong> ${data.QuarterlyRevenueGrowthYOY}</p>
+          <p><strong>Analyst Target Price:</strong> ${data.AnalystTargetPrice}</p>
+          <p><strong>Trailing P/E:</strong> ${data.TrailingPE}</p>
+          <p><strong>Forward P/E:</strong> ${data.ForwardPE}</p>
+          <p><strong>Price-to-Sales Ratio TTM:</strong> ${data.PriceToSalesRatioTTM}</p>
+          <p><strong>Price-to-Book Ratio:</strong> ${data.PriceToBookRatio}</p>
+          <p><strong>EV-to-Revenue:</strong> ${data.EVToRevenue}</p>
+          <p><strong>EV-to-EBITDA:</strong> ${data.EVToEBITDA}</p>
+          <p><strong>Beta:</strong> ${data.Beta}</p>
+          <p><strong>52-Week High:</strong> ${data['52WeekHigh']}</p>
+          <p><strong>52-Week Low:</strong> ${data['52WeekLow']}</p>
+          <p><strong>50-Day Moving Average:</strong> ${data['50DayMovingAverage']}</p>
+          <p><strong>200-Day Moving Average:</strong> ${data['200DayMovingAverage']}</p>
+          <p><strong>Shares Outstanding:</strong> ${data.SharesOutstanding}</p>
+          <p><strong>Dividend Date:</strong> ${data.DividendDate}</p>
+          <p><strong>Ex-Dividend Date:</strong> ${data.ExDividendDate}</p>
         `;
         stockInfoDiv.appendChild(infoDiv);
       }
