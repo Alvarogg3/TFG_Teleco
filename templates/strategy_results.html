@@ -80,7 +80,9 @@
       <!-- Saving and optimize buttons here -->
       <div class="mt-5">
         <div class="d-flex align-items-center">
-          <button onclick="downloadIframeContent()" class="btn btn-secondary mr-4">Download Graph in HTML</button>
+          <!-- Download buttons here -->
+          <button id="download-excel-btn" class="btn btn-secondary mr-4">Download All Statistics in Excel</button>
+          <button onclick="downloadIframeContent()" class="btn btn-secondary mx-4">Download Graph in HTML</button>
           <div class="ml-4">
             <button class="btn btn-success " onclick="saveBacktestName()">Save Backtest</button>
           </div>
@@ -102,9 +104,6 @@
       <div class="mt-5">
         <!-- Output data here -->
         <p id="output"></p>
-        <!-- Download buttons here -->
-        <button id="download-excel-btn" class="btn btn-secondary">Download All Statistics in Excel</button>
-
       </div>
   </main>
 
@@ -538,6 +537,7 @@
             // Redirect to the updated URL
             window.location.href = url.href;
           } else {
+            loadingSpinner.style.display = 'display: none;';
             alert('Error optimizing strategy. Some of the parameters combinations might result in no trades.');
           }
         })

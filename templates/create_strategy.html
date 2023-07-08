@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trader Companion - Upload Strategy</title>
+  <!-- Include Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <a class="navbar-brand" href="/">Trader Companion</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+        <ul class="navbar-nav">
+          {% if session['username'] %}
+            <li class="nav-item mr-5">
+              <a class="nav-link font-weight-bold" href="/backtests">{{ session['username']|capitalize }}'s Backtests</a>
+            </li>
+            <li class="nav-item mr-5">
+              <a class="nav-link" href="/logout">Logout</a>
+            </li>
+          {% else %}
+            <li class="nav-item mr-5">
+              <a class="nav-link font-weight-bold" href="/login">Login</a>
+            </li>
+            <li class="nav-item mr-5">
+              <a class="nav-link" href="/signup">Signup</a>
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <h1 class="mt-4">Upload Your Strategy</h1>
+
+    <form action="/handle_upload" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="strategy_name">Strategy Name:</label>
+        <input type="text" class="form-control" name="strategy_name" id="strategy_name" required>
+        <small class="form-text text-muted">Note: The strategy name must match the file name and be a unique identifier.</small>
+      </div>
+      <div class="form-group">
+        <label for="strategy_description">Strategy Description:</label>
+        <textarea class="form-control" name="strategy_description" id="strategy_description" rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="strategy_file">Strategy File:</label>
+        <input type="file" class="form-control-file" name="strategy_file" accept=".py" required>
+      </div>
+      <div class="form-group mt-5">
+        <h3>Parameters to Optimize</h3>
+        <div id="parameters_container">
+          <!-- Parameter fields will be dynamically added here -->
+        </div>
+        <button type="button" class="btn btn-primary mt-4" id="add_parameter_button">Add Parameter</button>
+      </div>
+      <button type="submit" class="btn btn-success mt-5">Upload</button>
+    </form>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer bg-dark text-white text-center py-3 mt-5">
+    <div class="container">
+      <span>&copy; 2023 Trader Companion. All rights reserved.</span>
+    </div>
+  </footer>
+
+  <!-- Include Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    // Function to handle adding a new parameter field
+    function addParameter() {
+      const container = document.getElementById("parameters_container");
+
+      // Create a new parameter field
+      const parameterField = document.createElement("div");
+      parameterField.classList.add("form-row","mt-3");
+
+      // Create input field for parameter name
+      const parameterNameInput = document.createElement("input");
+      parameterNameInput.type = "text";
+      parameterNameInput.classList.add("form-control", "col");
+      parameterNameInput.name = "parameter_name[]";
+      parameterNameInput.placeholder = "Parameter Name";
+      parameterField.appendChild(parameterNameInput);
+
+      // Create input field for default value
+      const defaultValueInput = document.createElement("input");
+      defaultValueInput.type = "text";
+      defaultValueInput.classList.add("form-control", "col");
+      defaultValueInput.name = "default_value[]";
+      defaultValueInput.placeholder = "Default Value";
+      parameterField.appendChild(defaultValueInput);
+
+      // Create input field for parameter description
+      const descriptionInput = document.createElement("input");
+      descriptionInput.type = "text";
+      descriptionInput.classList.add("form-control", "col");
+      descriptionInput.name = "description[]";
+      descriptionInput.placeholder = "Description";
+      parameterField.appendChild(descriptionInput);
+
+      // Create remove button
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.classList.add("btn", "btn-danger", "col-auto");
+      removeButton.textContent = "Remove";
+      removeButton.addEventListener("click", () => {
+        container.removeChild(parameterField);
+      });
+      parameterField.appendChild(removeButton);
+
+      // Append the parameter field to the container
+      container.appendChild(parameterField);
+    }
+
+    // Add event listener to the "Add Parameter" button
+    const addParameterButton = document.getElementById("add_parameter_button");
+    addParameterButton.addEventListener("click", addParameter);
+  </script>
+</body>
+</html>
