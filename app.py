@@ -332,22 +332,25 @@ def execute_strategy():
     ticker = request.args.get('ticker')
     frequency = int(request.args.get('frequency'))
     commission = float(request.args.get("commission"))
-    backtestId = request.args.get("backtestId")
+    backtest_id = request.args.get("backtestId")
 
     # Get the strategy class based on the strategy ID
     selected_strategy_class = strategy_classes.get(strategy_id)
-    if strategy_class is None:
+    if selected_strategy_class is None:
         return jsonify({'error': f"Invalid strategy ID: {strategy_id}"}), 404
 
-    if backtestId == "":
+    if backtest_id == "":
         # Get stock data for the ticker from MongoDB
         stock_data = get_stock_data_from_mongodb(ticker, start_date, end_date)
 
-        # Resample to correct freuency
-        data =  stock_data.iloc[::frequency]
+        # Resample to correct frequency
+        data = stock_data.iloc[::frequency]
 
         # Execute the strategy with the stock data
         bt = Backtest(data, selected_strategy_class, cash=10000, commission=commission, exclusive_orders=True)
+
+        # Create a dummy backtest object
+        backtest = {}
 
         # Save the bt object in the MongoDB collection if the user is authenticated
         if 'username' in session:
@@ -371,21 +374,20 @@ def execute_strategy():
                 {'$set': bt_document},
                 upsert=True
             )
-            backtest = {'a':0}
     else:
         # Get the backtest object from MongoDB
-        backtest = bt_collection.find_one({'username': session['username'], 'name': backtestId})
+        backtest = bt_collection.find_one({'username': session['username'], 'name': backtest_id})
+        if backtest is None:
+            return jsonify({'error': 'Backtest not found.'}), 404
         bt = pickle.loads(backtest['bt_object'])
 
     try:
-        # Check if the 'opt_values' field exists in the backtest document
-        if 'opt_values' in backtest:
+        if backtest.get('opt_values'):
             opt_values = backtest['opt_values']
             result = bt.optimize(**opt_values, maximize='Equity Final [$]')
-            # Use optimized values for further processing
         else:
             result = bt.run()
-        # Check if there are trades
+
         if result["# Trades"] > 1:
             # Generate the plot and save it as HTML
             plot_filename = f"static/html_outputs/{selected_strategy_class.__name__}.html"
@@ -394,7 +396,7 @@ def execute_strategy():
             return jsonify({'output': json.dumps(result[:-3].to_dict(), default=str),
                             'key_indicators': json.dumps(result[KEY_INDICATORS].to_dict(), default=str), 
                              'plot_filename': plot_filename}) 
-        else: 
+        else:
             return jsonify({'error': 'There are not enough trades for this strategy.'}), 404
     except Exception as e:
         # Return an error message
