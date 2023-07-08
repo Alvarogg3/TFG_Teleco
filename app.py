@@ -92,20 +92,15 @@ app.permanent_session_lifetime = app.config['PERMANENT_SESSION_LIFETIME']
 def index():
     return render_template('index.html')
 
-@app.route('/check_strategies')
-def check_strategies():
-    # Logic for rendering the test strategy page
-    return render_template('check_strategies.html')
-
-# Route to render the create form
-@app.route('/create_strategy', methods=['GET'])
-def create_strategy():
-    return render_template('create_strategy.html')
-
 @app.route('/select_stocks/<string:id>')
 def select_stocks(id):
     # Logic for rendering the create strategy page with the provided strategy ID
     return render_template('select_stocks.html', strategy_id=id)
+
+@app.route('/check_strategies')
+def check_strategies():
+    # Logic for rendering the test strategy page
+    return render_template('check_strategies.html')
 
 @app.route('/display_results', methods=['GET'])
 def display_results():
@@ -220,19 +215,10 @@ def check_data_availability():
 
 @app.route('/get_strategies')
 def get_strategies():
-    if 'username' in session:
-        # Get strategies for all users
-        all_strategies = list(strategies_collection.find({"users": "all"}, {"_id": 0}))
+    # Get strategies for all users
+    strategies = strategies_collection.find({"users": "all"}, {"_id": 0})  # Exclude the _id field from the result
 
-        # Get user's strategies
-        user_strategies = list(strategies_collection.find({"users": session['username']}, {"_id": 0}))
-
-        return jsonify({'all_strategies': all_strategies, 'user_strategies': user_strategies})
-    else:
-        # Get strategies for all users
-        strategies = list(strategies_collection.find({"users": "all"}, {"_id": 0}))
-
-        return jsonify({'all_strategies': strategies})
+    return jsonify(list(strategies))
 
 @app.route('/get_backtests')
 def get_backtests():
@@ -278,49 +264,6 @@ def download_strategy(strategyFilename):
     except Exception as e:
         # Handle the case if the strategy module file is not found or any other error occurs
         return jsonify({'error': str(e)}), 404
-    
-# Route to handle the strategy upload form submission
-@app.route('/handle_upload', methods=['POST'])
-def handle_upload():
-    # Get the strategy name and description from the form data
-    strategy_name = request.form.get('strategy_name')
-    strategy_description = request.form.get('strategy_description')
-
-    # Get the uploaded strategy file
-    strategy_file = request.files.get('strategy_file')
-
-    # Save the strategy file in the modules folder
-    strategy_filename = strategy_name + ".py"
-    strategy_file.save(os.path.join('modules', strategy_filename))
-
-    # Prepare the strategy information to be stored in MongoDB
-    strategy_info = {
-        'users': session['username'],
-        'strategy_id': strategy_name,
-        'description': strategy_description,
-        'parameters': {}
-    }
-
-    # Get the parameter details from the form data
-    parameter_names = request.form.getlist('parameter_name[]')
-    default_values = request.form.getlist('default_value[]')
-    descriptions = request.form.getlist('description[]')
-
-    # Create the parameter entries in the strategy information
-    for i in range(len(parameter_names)):
-        parameter_name = parameter_names[i]
-        default_value = default_values[i]
-        description = descriptions[i]
-
-        strategy_info['parameters'][parameter_name] = {
-            'value': default_value,
-            'description': description
-        }
-
-    # Save the strategy information in MongoDB
-    strategies_collection.insert_one(strategy_info)
-
-    return redirect(f'/select_stocks/{strategy_name}')  # Redirect to the selection of stocks for the strategy
 
 # Execute a trading strategy
 @app.route('/execute_strategy', methods=['GET'])
@@ -495,7 +438,6 @@ def optimize_strategy():
     try:
         # Get the strategy parameters from the request body
         strategy_params = request.json['formData']
-        print(strategy_params)
 
         # Set up the optimization ranges for each parameter
         param_ranges = {}

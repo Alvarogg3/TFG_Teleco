@@ -42,15 +42,6 @@
   <main class="container">
     <h1 class="mt-4">Available Strategies</h1>
 
-    {% if session['username'] %}
-    <hr>
-    <h3 class="mt-4">{{ session['username']|capitalize }}'s Strategies</h3>
-    <div class="row mt-5" id="user-strategies-container">
-      <!-- User's strategies will be dynamically added here -->
-    </div>
-    {% endif %}
-
-    <h3 class="mt-4">Common Strategies</h3>
     <div class="row mt-5" id="strategies-container">
       <!-- Strategies will be dynamically added here -->
     </div>
@@ -80,12 +71,11 @@
     async function fetchStrategies() {
       try {
         const response = await fetch('/get_strategies'); // Replace with your API endpoint to fetch strategies
-        const data = await response.json();
+        const strategies = await response.json();
 
         const strategiesContainer = document.getElementById('strategies-container');
-        const userStrategiesContainer = document.getElementById('user-strategies-container');
 
-        data.all_strategies.forEach(strategy => {
+        strategies.forEach(strategy => {
           const strategyCard = `
             <div class="col-md-4 mb-4">
               <div class="card">
@@ -102,26 +92,6 @@
 
           strategiesContainer.innerHTML += strategyCard;
         });
-
-        {% if session['username'] %}
-        data.user_strategies.forEach(strategy => {
-          const strategyCard = `
-            <div class="col-md-4 mb-4">
-              <div class="card">
-                <img class="card-img-top" src="../static/images/strategies.jpg" alt="Strategy Image">
-                <div class="card-body">
-                  <h5 class="card-title">${strategy.strategy_id}</h5>
-                  <p class="card-text">${strategy.description}</p>
-                  <a href="/select_stocks/${strategy.strategy_id}" class="btn btn-primary">Test Strategy</a>
-                  <a href="/download_strategy/${strategy.strategy_id}.py" class="btn btn-secondary">Download Code</a>
-                </div>
-              </div>
-            </div>
-          `;
-
-          userStrategiesContainer.innerHTML += strategyCard;
-        });
-        {% endif %}
       } catch (error) {
         console.error('Error fetching strategies:', error);
       }
