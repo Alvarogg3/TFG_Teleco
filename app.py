@@ -197,8 +197,8 @@ def search_ticker():
 @app.route('/get_stock_info', methods=['GET'])
 def get_stock_info():
     ticker = request.args.get('ticker')
-    url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker}&apikey={ALPHAVANTAGE_KEY_2}'
-    
+    url = f'https://www.alphavantage.co/query?function=OVERVIEW\
+            &symbol={ticker}&apikey={ALPHAVANTAGE_KEY_2}'
     response = requests.get(url)
     data = response.json()
     
@@ -451,7 +451,11 @@ def download_data():
             bt = pickle.loads(bt_pickled)
 
             # Run the bt object to obtain the output
-            result = bt.run()
+            if bt_document.get('opt_values'):
+                opt_values = bt_document['opt_values']
+                result = bt.optimize(**opt_values, maximize='Equity Final [$]')
+            else:
+                result = bt.run()
 
             # Create an ExcelWriter object
             with pd.ExcelWriter('statistics.xlsx', engine='xlsxwriter') as excel_writer:
@@ -464,9 +468,17 @@ def download_data():
 @app.route('/get_optim_parameters', methods=['GET'])
 def get_parameter_descriptions():
     strategy_id = request.args.get('strategyId')
+    backtest_name = request.args.get('backtestId')
     username = session.get('username')
 
+    opt_values = {}
     parameter_descriptions = {}
+
+    if backtest_name != "":
+        # Fetch the bt object from MongoDB
+        bt_document = bt_collection.find_one({'name': backtest_name})
+        if bt_document.get('opt_values'):
+            opt_values = bt_document['opt_values']
     
     # Fetch the document from MongoDB based on the strategy_id and username
     document = strategies_collection.find_one({'strategy_id': strategy_id, 'users': {'$in': [username, 'all']}})
@@ -477,7 +489,10 @@ def get_parameter_descriptions():
         
         # Loop through the parameters and descriptions
         for parameter, description in parameters.items():
-            value = description.get('value')
+            if opt_values:
+                value = opt_values.get(parameter)
+            else:
+                value = description.get('value')
             param_description = description.get('description')
             
             # Create the parameter description dictionary
