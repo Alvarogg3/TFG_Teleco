@@ -383,7 +383,7 @@
     // Fetch parameter descriptions from the server
     const fetchParameterDescriptions = async (strategyId) => {
       try {
-        const response = await fetch(`/get_optim_parameters?strategyId=${strategyId}`);
+        const response = await fetch(`/get_optim_parameters?strategyId=${strategyId}&backtestId=${backtestId}`);
         const parameterDescriptions = await response.json();
         return parameterDescriptions;
       } catch (error) {
@@ -406,7 +406,7 @@
 
         // Create the label element
         const label = document.createElement('label');
-        label.innerHTML = `<strong>${parameter}</strong>  --   default value: ${parameterDescription.value}`;
+        label.innerHTML = `<strong>${parameter}</strong>  --   current value: ${parameterDescription.value}`;
         formGroupDiv.appendChild(label);
 
         // Create a row to hold the inputs
