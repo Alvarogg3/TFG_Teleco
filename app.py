@@ -197,8 +197,7 @@ def search_ticker():
 @app.route('/get_stock_info', methods=['GET'])
 def get_stock_info():
     ticker = request.args.get('ticker')
-    url = f'https://www.alphavantage.co/query?function=OVERVIEW\
-            &symbol={ticker}&apikey={ALPHAVANTAGE_KEY_2}'
+    url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker}&apikey={ALPHAVANTAGE_KEY_2}'
     response = requests.get(url)
     data = response.json()
     
